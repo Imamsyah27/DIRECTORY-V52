@@ -129,3 +129,8 @@ Order → **🔑 HAV**: daftar pembelian key (waktu, pembeli, batch, jumlah, har
 - Menu **Order → Bot Order / Bulk Order**: kolom **🔍 Cari** (tagar, nama pelanggan, atau nomor pesanan). Hasil mencakup semua status & paket di tab itu; tagar yang cocok ditandai 🔎.
 - Mencari dulu di data yang sudah dimuat di browser. Server (`bot_search_tags`, maks. 50 hasil) hanya dipakai bila ada pesanan yang daftar tagarnya belum dibuka, minimal 2 huruf, dengan jeda ketik 400 ms. Hasil yang sama tidak diminta ulang.
 
+## 21. Total tagar per hari (portal pelanggan) — jalankan `migrations/003_cu_bot_daily.sql`
+- Tab **🤖 Bot Order** pelanggan: panel **📊 Total Tagar per Hari** (tanggal, jumlah tagar, jumlah pesanan), default 7 hari, pilihan 7 / 14 / 30 hari. Pesanan ditolak tidak dihitung; tanggal zona Asia/Jakarta.
+- Dihitung di database (`cu_bot_daily`, group by tanggal). Pelanggan hanya melihat miliknya (dari sesi login). Dimuat saat tab dibuka / rentang diganti / ada pesanan baru, tidak ikut polling.
+- File baru: `pelanggan/js/bot-daily.js` (teks 5 bahasa).
+

@@ -116,6 +116,7 @@ async function loadBotOrders() {
     if (!$("botOrderList")) return;
     const { data, error } = await cuRpc("cu_my_bot_orders");
     myBotOrders = (!error && data) ? data : [];
+    if (!error && typeof botDailyOrdersChanged === "function") botDailyOrdersChanged(myBotOrders);   // total per hari ikut diperbarui bila ada pesanan baru
     // batch: tagar MILIK SENDIRI ada berapa di batch berapa (tanpa SQL 23 -> kosong, tampilan lama tetap jalan)
     const b = await cuRpc("cu_my_bot_batches");
     botBatchInfo = {}; if (!b.error && b.data) b.data.forEach(x => { botBatchInfo[x.order_id] = x; });

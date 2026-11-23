@@ -288,3 +288,17 @@ body{
 .bo-batches{ display:flex; flex-wrap:wrap; gap:6px; margin-top:6px; }
 .bo-bchip{ display:inline-block; padding:3px 9px; border-radius:99px; font-size:11.5px; font-weight:700; background:rgba(100,116,139,.15); color:inherit; }
 .bo-bchip.done{ background:rgba(22,163,74,.16); color:#16a34a; } .bo-bchip.part{ background:rgba(217,119,6,.16); color:#d97706; }
+/* Bot Order: total tagar per hari */
+.bd-panel .panel-title{ display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:6px 12px; }
+.bd-sum{ font-size:12.5px; font-weight:600; color:var(--text-secondary); }
+.bd-list{ list-style:none; margin:8px 0 0; padding:0; }
+.bd-list li{ display:grid; grid-template-columns:minmax(92px,auto) 1fr auto; align-items:center; gap:10px; padding:7px 0; border-top:1px solid var(--border); font-size:13px; }
+.bd-list li:first-child{ border-top:none; }
+.bd-list li.zero{ opacity:.55; }
+.bd-date{ white-space:nowrap; }
+.bd-bar{ height:8px; border-radius:99px; background:rgba(100,116,139,.15); overflow:hidden; min-width:40px; }
+.bd-bar i{ display:block; height:100%; border-radius:99px; background:var(--primary, #2563eb); }
+.bd-num{ text-align:end; white-space:nowrap; } .bd-num small{ display:block; font-size:11px; color:var(--text-secondary); }
+.bd-empty{ padding:14px 0; text-align:center; color:var(--text-secondary); font-size:13px; }
+.bd-note{ margin-top:8px; font-size:11.5px; color:var(--text-secondary); }
+
