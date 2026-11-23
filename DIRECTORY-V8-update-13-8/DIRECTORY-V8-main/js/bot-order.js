@@ -30,8 +30,10 @@ function boSetKind(k) {
     boEl("boThHarga").textContent = bulk ? "Tier" : "Harga/tagar";
     boEl("boEmpty").textContent = bulk ? "Belum ada bulk order." : "Belum ada bot order.";
     boEl("boPinSubmit").textContent = bulk ? "Buka Bulk Order" : "Buka Bot Order";
+    boEl("boPkg").style.display = bulk ? "none" : "flex";     // Bulk = BEM+SEM+LEM dalam 1 pesanan, tidak dipisah per paket
     if (boAll.length) boRender();
 }
+let boPkg = "BEM";    // sub-tab Bot Order: BEM | SEM | LEM | all
 let boAll = [], boFilter = "pending", boOpen = new Set(), boTagCache = {}, boBound = false;
 
 async function boRpc(name, params) {
@@ -62,6 +64,9 @@ function initBotOrderPage() {
         boEl("boBody").addEventListener("click", boOnClick);
         boEl("boBody").addEventListener("change", boOnChange);
         boEl("boArchiveSent").addEventListener("click", boArchiveSent);
+        boEl("boPkg").addEventListener("click", e => { const b = e.target.closest("button[data-pkg]"); if (b) { boPkg = b.dataset.pkg; boRender(); } });
+        boEl("boApproveAll").addEventListener("click", boApproveAll);
+        boEl("boSentAll").addEventListener("click", boSentAll);
         const goBot = boEl("dashBotTab"); if (goBot) goBot.addEventListener("click", () => { document.querySelector('#pageNav button[data-page="order"]').click(); if (typeof ordShow === "function") ordShow("bot"); });
     }
     if (boPin()) boShow();
@@ -85,8 +90,10 @@ function boBadge() {
     [["boNavBadge", nBot], ["bkNavBadge", nBulk], ["boDashBadge", nBot + nBulk]].forEach(([id, n]) => { const b = boEl(id); if (b) { b.textContent = n; b.style.display = n ? "inline-block" : "none"; } });
 }
 
-function boMatch(r, f) {
+const boOpenRow = r => !r.arsip && (r.status === "pending" || boState(r) === "kirim");
+function boMatch(r, f, pkg = boPkg) {
     if (boIsBulk(r) !== (boKind === "bulk")) return false;      // tab Bot hanya Bot Order, tab Bulk hanya Bulk Order
+    if (boKind === "bot" && pkg !== "all" && r.dashboard !== pkg) return false;   // sub-tab BEM / SEM / LEM
     if (f === "arsip") return !!r.arsip;
     if (f === "all") return true;
     return !r.arsip && boState(r) === f;
@@ -94,8 +101,18 @@ function boMatch(r, f) {
 function boRender() {
     boBadge();
     boEl("boFilter").querySelectorAll("button").forEach(b => { b.classList.toggle("on", b.dataset.f === boFilter); b.querySelector("i").textContent = boAll.filter(r => boMatch(r, b.dataset.f)).length; });
-    const sentN = boAll.filter(r => boMatch(r, "sent")).length;
-    boEl("boBulk").style.display = sentN ? "block" : "none"; boEl("boSentN").textContent = sentN;
+    boEl("boPkg").querySelectorAll("button").forEach(b => {
+        b.classList.toggle("on", b.dataset.pkg === boPkg);
+        const n = boAll.filter(r => boMatch(r, "all", b.dataset.pkg) && boOpenRow(r)).length;
+        b.querySelector("i").textContent = n; b.classList.toggle("has-pending", n > 0);
+    });
+    // tombol massal: hanya untuk pesanan yang sedang tampil (paket + filter)
+    const approveN = boFilter === "pending" ? boAll.filter(r => boMatch(r, "pending")).length : 0;
+    const sentAllN = boFilter === "kirim" ? boAll.filter(r => boMatch(r, "kirim")).length : 0;
+    const sentN = boFilter === "sent" || boFilter === "all" ? boAll.filter(r => boMatch(r, "sent", "all")).length : 0;
+    const show = (id, n, nId) => { boEl(id).style.display = n ? "" : "none"; boEl(nId).textContent = n; };
+    show("boApproveAll", approveN, "boApproveN"); show("boSentAll", sentAllN, "boSentAllN"); show("boArchiveSent", sentN, "boSentN");
+    boEl("boBulk").style.display = approveN || sentAllN || sentN ? "flex" : "none";
     const rows = boAll.filter(r => boMatch(r, boFilter));
     boEl("boEmpty").style.display = rows.length ? "none" : "block";
     const pill = { pending: ["⏳ Menunggu", "bp-pill mn"], kirim: ["📮 Perlu dikirim", "bp-pill rq"], sent: ["✅ Terkirim", "bp-pill rq"], rejected: ["✖ Ditolak", "bp-pill mn"] };
@@ -134,8 +151,47 @@ async function boOnChange(e) {
     showToast(want ? "Ditandai sudah dikirim" : "Tanda dikirim dilepas", want ? "success" : "info");
     boLoad();
 }
+const boViewLabel = () => boKind === "bulk" ? "bulk order" : boPkg === "all" ? "bot order (semua paket)" : `${boPkg} order`;
+/* hasil aksi massal: {ok: [id], fail: [{id, error}]} */
+function boMassToast(data, verb) {
+    const ok = (data && data.ok || []).length, fail = (data && data.fail) || [];
+    if (!fail.length) { showToast(`${ok} pesanan ${verb}`, "success"); return; }
+    console.warn("gagal:", fail);
+    showToast(`${ok} pesanan ${verb}, ${fail.length} gagal (${fail.slice(0, 3).map(f => "#" + f.id + ": " + f.error).join("; ")})`, "danger");
+}
+let boMassBusy = false;
+function boApproveAll() {
+    const list = boAll.filter(r => boMatch(r, "pending")); if (!list.length || boMassBusy) return;
+    const tags = list.reduce((a, r) => a + Number(r.jumlah || 0), 0), total = list.reduce((a, r) => a + Number(r.total_harga || 0), 0);
+    openConfirmModal({ icon: "✅", iconClass: "success", title: `Terima semua ${boViewLabel()}?`,
+        body: `<b>${list.length} pesanan</b> (${tags} tagar) senilai <b>${boRp(total)}</b> disetujui sekaligus.<br>Semua otomatis tercatat di <b>BSL Profit</b> dan tagarnya masuk antrian Batch Tagar.`,
+        confirmText: "Ya, Terima Semua", confirmClass: "btn-success",
+        onConfirm: async () => {
+            boMassBusy = true; boEl("boApproveAll").disabled = true;
+            const { data, error } = await boRpc("bot_approve_many", { p_ids: list.map(r => r.id) });
+            boMassBusy = false; boEl("boApproveAll").disabled = false;
+            if (!error) boMassToast(data, "disetujui");
+            boLoad();
+        } });
+}
+function boSentAll() {
+    const list = boAll.filter(r => boMatch(r, "kirim")); if (!list.length || boMassBusy) return;
+    const tags = list.reduce((a, r) => a + Number(r.jumlah || 0), 0);
+    openConfirmModal({ icon: "✅", iconClass: "success", title: `Tandai semua ${boViewLabel()} sudah dikirim?`,
+        body: `<b>${list.length} pesanan</b> (${tags} tagar) ditandai sudah dikirim. Tagarnya keluar dari Batch Tagar dan pelanggan langsung melihat "Sudah dikirim".`,
+        confirmText: "Ya, Tandai Dikirim", confirmClass: "btn-success",
+        onConfirm: async () => {
+            boMassBusy = true; boEl("boSentAll").disabled = true;
+            const { data, error } = await boRpc("bot_set_dikirim_many", { p_ids: list.map(r => r.id) });
+            boMassBusy = false; boEl("boSentAll").disabled = false;
+            if (error) return;
+            const now = new Date().toISOString(), ok = new Set((data && data.ok) || []);
+            boAll.forEach(r => { if (ok.has(r.id)) r.dikirim_at = r.dikirim_at || now; });     // perbarui lokal, tanpa memuat ulang
+            boRender(); boMassToast(data, "ditandai dikirim");
+        } });
+}
 function boArchiveSent() {
-    const n = boAll.filter(r => boMatch(r, "sent")).length; if (!n) return;
+    const n = boAll.filter(r => boMatch(r, "sent", "all")).length; if (!n) return;
     openConfirmModal({ icon: "📦", iconClass: "info", title: "Arsipkan semua yang terkirim?", body: `<b>${n} bot order</b> yang sudah dikirim dipindah ke Arsip. Masih bisa dikembalikan.`,
         confirmText: "Ya, Arsipkan", confirmClass: "btn-primary",
         onConfirm: async () => { const { data, error } = await boRpc("bot_archive_sent", { p_bulk: boKind === "bulk" }); if (!error) { showToast(`${data} ${boKind === "bulk" ? "bulk" : "bot"} order diarsipkan`, "success"); boLoad(); } } });

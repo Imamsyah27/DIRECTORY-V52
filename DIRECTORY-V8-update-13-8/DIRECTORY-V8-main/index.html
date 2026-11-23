@@ -965,6 +965,12 @@
             <section class="panel table-section">
                 <div class="panel-title"><span id="boTitle">🤖 Antrian Bot Order</span> <span class="panel-hint">1 pesanan = 1 baris, tagar disembunyikan (klik jumlah tagar untuk melihat)</span></div>
                 <p class="muted-note" id="boNote">Saat Anda menekan <b>Setujui</b>, pesanan otomatis dicatat di <b>BSL Profit</b> (omset = total bayar, modal = modal bot × jumlah tagar).</p>
+                <div class="hold-tabs bo-pkg" id="boPkg">
+                    <button type="button" data-pkg="BEM" class="on">BEM Order <i>0</i></button>
+                    <button type="button" data-pkg="SEM">SEM Order <i>0</i></button>
+                    <button type="button" data-pkg="LEM">LEM Order <i>0</i></button>
+                    <button type="button" data-pkg="all">Semua <i>0</i></button>
+                </div>
                 <div class="rn-filter" id="boFilter">
                     <button type="button" data-f="pending" class="on">⏳ Menunggu <i>0</i></button>
                     <button type="button" data-f="kirim">📮 Perlu Dikirim <i>0</i></button>
@@ -973,7 +979,11 @@
                     <button type="button" data-f="arsip">🗂️ Arsip <i>0</i></button>
                     <button type="button" data-f="all">Semua <i>0</i></button>
                 </div>
-                <div class="bo-bulk" id="boBulk" style="display:none;"><button type="button" class="btn btn-ghost" id="boArchiveSent">📦 Arsipkan semua yang sudah terkirim <b id="boSentN">0</b></button></div>
+                <div class="bo-bulk" id="boBulk" style="display:none;">
+                    <button type="button" class="btn btn-success" id="boApproveAll" style="display:none;">✅ Terima semua <b id="boApproveN">0</b></button>
+                    <button type="button" class="btn btn-success" id="boSentAll" style="display:none;">✅ Tandai semua sudah dikirim <b id="boSentAllN">0</b></button>
+                    <button type="button" class="btn btn-ghost" id="boArchiveSent" style="display:none;">📦 Arsipkan semua yang sudah terkirim <b id="boSentN">0</b></button>
+                </div>
                 <div class="table-wrap">
                     <table id="boTable" style="min-width:940px;">
                         <thead><tr><th>Waktu</th><th>Pelanggan</th><th id="boThPkg">Paket</th><th>Tagar</th><th id="boThHarga">Harga/tagar</th><th>Total</th><th>Status</th><th>Dikirim</th><th>Aksi</th></tr></thead>

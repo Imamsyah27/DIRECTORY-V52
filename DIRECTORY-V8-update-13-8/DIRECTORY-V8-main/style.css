@@ -1464,3 +1464,9 @@ tr.pe-bulk .ie-input{ width:100%; }
 .tg-ev{ display:flex; gap:8px; align-items:center; font-size:13.5px; cursor:pointer; }
 .tg-actions{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:14px; } .tg-out{ font-size:13px; }
 .tg-ok{ color:var(--success); font-weight:700; } .tg-bad{ color:var(--danger); font-weight:700; } .tg-off{ opacity:.75; }
+/* Batch tagar: tombol tandai terkirim per batch */
+.bb-mark{ margin-bottom:8px; }
+/* Bot Order: sub-tab paket + tombol massal */
+.bo-pkg{ flex-wrap:wrap; }
+.bo-pkg i{ font-style:normal; opacity:.85; margin-left:4px; }
+.bo-bulk{ display:flex; flex-wrap:wrap; gap:8px; }

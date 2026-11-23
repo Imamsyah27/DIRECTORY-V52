@@ -127,6 +127,8 @@ function botBatchHtml(r) {
     const bi = botBatchInfo[r.id]; if (!bi || !bi.batches || !bi.batches.length) return "";
     return `<div class="bo-batches">` + bi.batches.map(x => {
         const done = x.sent >= x.n, part = x.sent > 0 && !done;
+        // batch = null -> tagar yang sudah terkirim (sudah keluar dari antrian batch)
+        if (x.batch == null) return `<span class="bo-bchip done">${escapeHtml(x.dashboard)}: ${escapeHtml(t("bo_tags_n", { n: x.n }))} ✅</span>`;
         return `<span class="bo-bchip ${done ? "done" : part ? "part" : ""}">${escapeHtml(x.dashboard)} · ${escapeHtml(t("bb_batch"))} ${x.batch}: ${escapeHtml(t("bo_tags_n", { n: x.n }))} ${done ? "✅" : part ? "⏳ " + x.sent + "/" + x.n : "⏳"}</span>`;
     }).join("") + `</div>`;
 }

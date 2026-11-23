@@ -117,3 +117,10 @@ Order → **🔑 HAV**: daftar pembelian key (waktu, pembeli, batch, jumlah, har
 - Cara kerja: trigger database memanggil API Telegram lewat ekstensi **pg_net** (tanpa server tambahan). Kegagalan Telegram tidak pernah menggagalkan pesanan pelanggan.
 - Pasang: SQL `koin-usdt-24-telegram.sql` lalu `24b` → buat bot di @BotFather (token) → kirim /start ke bot → di halaman Telegram isi token, **Cari Chat ID**, centang Aktifkan, Simpan, **Kirim tes**. Bila pg_net belum aktif: Supabase → Database → Extensions → aktifkan pg_net lalu jalankan ulang file 24.
 - Token tersimpan di database (tanpa akses publik, hanya fungsi berPIN admin). Jangan tambahkan bot ke grup umum.
+
+## 19. Perbaikan Batch Tagar + aksi massal Bot Order — jalankan `migrations/001_bot_queue_status.sql`
+- SQL: jalankan **sekali** `migrations/001_bot_queue_status.sql` (setelah 23 & 23b). **Jangan** menjalankan ulang `koin-usdt-23` / `23b` sesudahnya.
+- Bug lama: tagar yang sudah dikirim tetap menempati Batch 1 karena nomor batch dihitung dari semua tagar (termasuk yang terkirim) sampai pesanannya diarsip.
+- Sekarang tiap tagar punya status **pending → sent → archived** (atau **cancelled**). Batch hanya berisi tagar pending.
+- **✅ Tandai sudah dikirim** (per batch): tagar langsung keluar dari batch, slot diisi tagar pending berikutnya. Tagar pindah ke panel **Sudah dikirim** (↩ untuk mengembalikan), lalu **📦 Arsipkan** (per paket / semua). Pesanan yang semua tagarnya terkirim ikut diarsip.
+- Menu **Order → Bot Order**: sub-tab **BEM Order / SEM Order / LEM Order / Semua**, tombol **✅ Terima semua** (filter Menunggu) dan **✅ Tandai semua sudah dikirim** (filter Perlu Dikirim) untuk pesanan yang sedang tampil — satu kali proses, tidak perlu klik satu per satu. Kedua tombol juga ada di Bulk Order.

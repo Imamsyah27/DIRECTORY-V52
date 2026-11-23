@@ -12,6 +12,7 @@
   ],
   "rewrites": [
     { "source": "/sql/:path*", "destination": "/tidak-ada" },
+    { "source": "/migrations/:path*", "destination": "/tidak-ada" },
     { "source": "/UPDATE-:rest(.*)", "destination": "/tidak-ada" },
     { "source": "/PORTAL-PELANGGAN-README.md", "destination": "/tidak-ada" }
   ]
