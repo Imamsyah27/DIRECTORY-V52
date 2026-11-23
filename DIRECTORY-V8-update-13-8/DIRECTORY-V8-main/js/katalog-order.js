@@ -42,7 +42,7 @@ async function kcInit(kind) {
         pane.innerHTML = `<section class="panel table-section"><div class="panel-title">${S.title} <span class="panel-hint">dibayar koin akun · tandai Selesai setelah dikirim</span></div>
             <div class="rn-filter" id="kcFilter-${kind}">
                 <button type="button" data-f="pending" class="on">⏳ Menunggu <i>0</i></button><button type="button" data-f="done">✅ Selesai <i>0</i></button>
-                <button type="button" data-f="rejected">✖ Ditolak <i>0</i></button><button type="button" data-f="all">Semua <i>0</i></button></div>
+                <button type="button" data-f="rejected">✖ Ditolak <i>0</i></button><button type="button" data-f="cancelled">🚫 Dibatalkan <i>0</i></button><button type="button" data-f="all">Semua <i>0</i></button></div>
             <div class="table-wrap"><table style="min-width:820px;"><thead><tr><th>Waktu</th><th>Pelanggan</th><th>Item</th><th>Jumlah</th><th>Total Koin</th><th>Catatan pelanggan</th><th>Status</th><th>Aksi</th></tr></thead>
             <tbody id="kcBody-${kind}"></tbody></table></div><div class="rn-empty" id="kcEmpty-${kind}" style="display:none;">Belum ada pesanan.</div></section>`;
         document.getElementById("kcFilter-" + kind).addEventListener("click", e => { const b = e.target.closest("button[data-f]"); if (b) { S.filter = b.dataset.f; kcRender(kind); } });
@@ -65,7 +65,7 @@ function kcRender(kind) {
     document.getElementById("kcFilter-" + kind).querySelectorAll("button").forEach(b => { b.classList.toggle("on", b.dataset.f === S.filter); b.querySelector("i").textContent = cnt(b.dataset.f); });
     const rows = S.all.filter(r => S.filter === "all" || r.status === S.filter);
     document.getElementById("kcEmpty-" + kind).style.display = rows.length ? "none" : "block";
-    const pill = { pending: ["⏳ Menunggu", "bp-pill mn"], done: ["✅ Selesai", "bp-pill rq"], rejected: ["✖ Ditolak", "bp-pill mn"] };
+    const pill = { pending: ["⏳ Menunggu", "bp-pill mn"], done: ["✅ Selesai", "bp-pill rq"], rejected: ["✖ Ditolak", "bp-pill mn"], cancelled: ["🚫 Dibatalkan pelanggan", "bp-pill mn"] };
     document.getElementById("kcBody-" + kind).innerHTML = rows.map(r => {
         const st = pill[r.status] || [r.status, "bp-pill mn"], wa = String(r.whatsapp || "").replace(/[^0-9]/g, "");
         const acts = r.status === "pending" ? `<button class="btn btn-success mini" data-act="done" data-id="${r.id}">✅ Selesai</button> <button class="btn btn-ghost mini" data-act="no" data-id="${r.id}">Tolak</button>` : `<button class="btn btn-ghost mini" data-act="del" data-id="${r.id}">Hapus</button>`;
@@ -139,7 +139,7 @@ async function spoInit() {
         pane.innerHTML = `<section class="panel table-section"><div class="panel-title">📦 Order Supply & Stock <span class="panel-hint">dibayar koin akun · klik tagar untuk menyalin · klik kontak untuk membuka WhatsApp / Messenger</span></div>
             <div class="rn-filter" id="spoFilter">
                 <button type="button" data-f="pending" class="on">⏳ Menunggu <i>0</i></button><button type="button" data-f="sent">✅ Terkirim <i>0</i></button>
-                <button type="button" data-f="rejected">✖ Ditolak <i>0</i></button><button type="button" data-f="all">Semua <i>0</i></button></div>
+                <button type="button" data-f="rejected">✖ Ditolak <i>0</i></button><button type="button" data-f="cancelled">🚫 Dibatalkan <i>0</i></button><button type="button" data-f="all">Semua <i>0</i></button></div>
             <div class="table-wrap"><table style="min-width:860px;"><thead><tr><th>Waktu</th><th>Pelanggan · Tagar · Kontak</th><th>Barang</th><th>Jumlah</th><th>Status</th><th>Aksi</th></tr></thead>
             <tbody id="spoBody"></tbody></table></div><div class="rn-empty" id="spoEmpty" style="display:none;">Belum ada pesanan.</div></section>`;
         document.getElementById("spoFilter").addEventListener("click", e => { const b = e.target.closest("button[data-f]"); if (b) { SPO.filter = b.dataset.f; spoRender(); } });
@@ -156,7 +156,7 @@ function spoRender() {
     document.getElementById("spoFilter").querySelectorAll("button").forEach(x => { x.classList.toggle("on", x.dataset.f === SPO.filter); x.querySelector("i").textContent = cnt(x.dataset.f); });
     const rows = SPO.all.filter(r => SPO.filter === "all" || r.status === SPO.filter);
     document.getElementById("spoEmpty").style.display = rows.length ? "none" : "block";
-    const pill = { pending: ["⏳ Menunggu", "bp-pill mn"], sent: ["✅ Terkirim", "bp-pill rq"], rejected: ["✖ Ditolak", "bp-pill mn"] };
+    const pill = { pending: ["⏳ Menunggu", "bp-pill mn"], sent: ["✅ Terkirim", "bp-pill rq"], rejected: ["✖ Ditolak", "bp-pill mn"], cancelled: ["🚫 Dibatalkan pelanggan", "bp-pill mn"] };
     document.getElementById("spoBody").innerHTML = rows.map(r => {
         const st = pill[r.status] || [r.status, "bp-pill mn"];
         const acts = r.status === "pending" ? `<button class="btn btn-success mini" data-act="sent" data-id="${r.id}">✅ Sudah dikirim</button> <button class="btn btn-ghost mini" data-act="no" data-id="${r.id}">Tolak</button>`

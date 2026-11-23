@@ -58,10 +58,8 @@ function renderCoinBox() {
     </div>`;
     $("coinTopupBtn").addEventListener("click", () => openTopupModal());
     $("coinHistBtn").addEventListener("click", () => { _coinHistOpen = !_coinHistOpen; renderCoinBox(); });
-    box.querySelectorAll("[data-cancel-topup]").forEach(b => b.addEventListener("click", async () => {
-        const { error } = await cuRpc("cu_cancel_topup", { p_id: Number(b.dataset.cancelTopup) });
-        if (!error) { showToast(t("coin_cancelled"), "success"); loadCoin(); }
-    }));
+    // batal top up: lewat dialog konfirmasi (js/cancel-order.js)
+    box.querySelectorAll("[data-cancel-topup]").forEach(b => b.addEventListener("click", () => cuAskCancel("topup", Number(b.dataset.cancelTopup), 0)));
 }
 
 /**

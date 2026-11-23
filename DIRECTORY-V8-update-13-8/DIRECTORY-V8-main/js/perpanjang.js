@@ -82,7 +82,7 @@ function renderRenewals() {
                     ${r.kirim_waktu === "hari_ini" ? `<span class="rn-kirim now">🔥 KIRIM HARI INI</span>` : r.kirim_waktu === "besok" ? `<span class="rn-kirim later">📅 Kirim besok</span>` : ""}
                     <span class="rn-chip-pkg">${pkgBerubah ? escapeHtml(r.dashboard_lama) + " ➜ " : ""}${escapeHtml(r.dashboard_baru)}</span>
                     <span class="rn-req-time">${rnWaktu(r.created_at)}</span>
-                    ${r.status === "approved" ? `<span class="badge badge-done">✅ Disetujui</span>` : r.status === "rejected" ? `<span class="badge badge-danger">✖ Ditolak</span>` : `<span class="badge badge-wait">⏳ Menunggu</span>`}
+                    ${r.status === "approved" ? `<span class="badge badge-done">✅ Disetujui</span>` : r.status === "rejected" ? `<span class="badge badge-danger">✖ Ditolak</span>` : r.status === "cancelled" ? `<span class="badge badge-danger">🚫 Dibatalkan pelanggan</span>` : `<span class="badge badge-wait">⏳ Menunggu</span>`}
                 </div>
                 ${r.total_harga != null && r.total_harga > 0 ? `<div class="rn-req-note rn-price">💰 <b>Rp ${Number(r.total_harga).toLocaleString("id-ID")}</b> · ${r.jumlah_item > 1 ? r.jumlah_item + " tagar × " : ""}${r.hari} hari × ${r.harga_normal_hari && r.harga_normal_hari !== r.harga_hari ? `<s>Rp ${Number(r.harga_normal_hari).toLocaleString("id-ID")}</s> ` : ""}Rp ${Number(r.harga_hari || 0).toLocaleString("id-ID")}${r.kode_referal ? ` · 🎟 ${escapeHtml(r.kode_referal)} (− Rp ${Number(r.diskon_referral || 0).toLocaleString("id-ID")})` : ""}</div>` : ""}
                 ${r.catatan_pelanggan ? `<div class="rn-req-note">📝 Catatan pelanggan: ${linkify(r.catatan_pelanggan)}</div>` : ""}

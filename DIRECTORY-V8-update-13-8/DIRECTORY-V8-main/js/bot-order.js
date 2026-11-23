@@ -160,7 +160,7 @@ function boRender() {
     const rows = boQ ? boSearchPool().filter(boHitOf) : boAll.filter(r => boMatch(r, boFilter));
     boSearchInfo(rows);
     boEl("boEmpty").style.display = rows.length ? "none" : "block";
-    const pill = { pending: ["⏳ Menunggu", "bp-pill mn"], kirim: ["📮 Perlu dikirim", "bp-pill rq"], sent: ["✅ Terkirim", "bp-pill rq"], rejected: ["✖ Ditolak", "bp-pill mn"] };
+    const pill = { pending: ["⏳ Menunggu", "bp-pill mn"], kirim: ["📮 Perlu dikirim", "bp-pill rq"], sent: ["✅ Terkirim", "bp-pill rq"], rejected: ["✖ Ditolak", "bp-pill mn"], cancelled: ["🚫 Dibatalkan pelanggan", "bp-pill mn"] };
     boEl("boBody").innerHTML = rows.map(r => {
         const open = boOpen.has(r.id), stt = boState(r), st = pill[stt] || [r.status, "bp-pill mn"];
         const wa = String(r.whatsapp || "").replace(/[^0-9]/g, "");
@@ -168,7 +168,7 @@ function boRender() {
         let acts;
         if (r.arsip) acts = `<button class="btn btn-ghost mini" data-act="unarsip" data-id="${r.id}">↩ Kembalikan</button> <button class="btn btn-ghost mini" data-act="del" data-id="${r.id}">Hapus</button>`;
         else if (stt === "pending") acts = `<button class="btn btn-success mini" data-act="ok" data-id="${r.id}">Setujui</button> <button class="btn btn-ghost mini" data-act="no" data-id="${r.id}">Tolak</button>`;
-        else if (stt === "sent" || stt === "rejected") acts = `<button class="btn btn-ghost mini" data-act="arsip" data-id="${r.id}">📦 Arsipkan</button>`;
+        else if (stt === "sent" || stt === "rejected" || stt === "cancelled") acts = `<button class="btn btn-ghost mini" data-act="arsip" data-id="${r.id}">📦 Arsipkan</button>`;
         else acts = `<span class="bo-hint">centang “Dikirim” bila sudah</span>`;
         const chk = (stt === "kirim" || stt === "sent") && !r.arsip
             ? `<label class="bo-chk"><input type="checkbox" data-id="${r.id}" ${r.dikirim_at ? "checked" : ""}><span></span></label>${r.dikirim_at ? `<small class="bo-sent-at">${boWaktu(r.dikirim_at)}</small>` : ""}`

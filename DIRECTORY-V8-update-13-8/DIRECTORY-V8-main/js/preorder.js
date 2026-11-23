@@ -125,7 +125,7 @@ async function poOrderInit() {
         pane.innerHTML = `<section class="panel table-section"><div class="panel-title">📝 Pre Order <span class="panel-hint">dibayar koin akun · 1 batch = 1 baris · tandai Selesai setelah diproses</span></div>
             <div class="rn-filter" id="poFilter">
                 <button type="button" data-f="pending" class="on">⏳ Menunggu <i>0</i></button><button type="button" data-f="done">✅ Selesai <i>0</i></button>
-                <button type="button" data-f="rejected">✖ Ditolak <i>0</i></button><button type="button" data-f="all">Semua <i>0</i></button></div>
+                <button type="button" data-f="rejected">✖ Ditolak <i>0</i></button><button type="button" data-f="cancelled">🚫 Dibatalkan <i>0</i></button><button type="button" data-f="all">Semua <i>0</i></button></div>
             <div class="table-wrap"><table style="min-width:900px;"><thead><tr><th>Waktu</th><th>Pelanggan</th><th>Barang</th><th>Tagar | jumlah</th><th>Total</th><th>Status</th><th>Aksi</th></tr></thead>
             <tbody id="poOrdBody"></tbody></table></div><div class="rn-empty" id="poOrdEmpty" style="display:none;">Belum ada pesanan Pre Order.</div></section>`;
         poEl("poFilter").addEventListener("click", e => { const b = e.target.closest("button[data-f]"); if (b) { poFilter = b.dataset.f; poOrdRender(); } });
@@ -149,7 +149,7 @@ function poOrdRender() {
     poEl("poFilter").querySelectorAll("button").forEach(b => { b.classList.toggle("on", b.dataset.f === poFilter); b.querySelector("i").textContent = cnt(b.dataset.f); });
     const rows = poOrders.filter(r => poFilter === "all" || r.status === poFilter);
     poEl("poOrdEmpty").style.display = rows.length ? "none" : "block";
-    const pill = { pending: ["⏳ Menunggu", "bp-pill mn"], done: ["✅ Selesai", "bp-pill rq"], rejected: ["✖ Ditolak", "bp-pill mn"] };
+    const pill = { pending: ["⏳ Menunggu", "bp-pill mn"], done: ["✅ Selesai", "bp-pill rq"], rejected: ["✖ Ditolak", "bp-pill mn"], cancelled: ["🚫 Dibatalkan pelanggan", "bp-pill mn"] };
     poEl("poOrdBody").innerHTML = rows.map(r => {
         const st = pill[r.status] || [r.status, "bp-pill mn"], wa = String(r.whatsapp || "").replace(/[^0-9]/g, "");
         const acts = r.status === "pending" ? `<button class="btn btn-success mini" data-act="done" data-id="${r.id}">✅ Selesai</button> <button class="btn btn-ghost mini" data-act="no" data-id="${r.id}">Tolak</button>` : `<button class="btn btn-ghost mini" data-act="del" data-id="${r.id}">Hapus</button>`;

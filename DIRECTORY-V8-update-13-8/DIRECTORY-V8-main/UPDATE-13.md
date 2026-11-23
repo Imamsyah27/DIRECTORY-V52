@@ -134,3 +134,10 @@ Order → **🔑 HAV**: daftar pembelian key (waktu, pembeli, batch, jumlah, har
 - Dihitung di database (`cu_bot_daily`, group by tanggal). Pelanggan hanya melihat miliknya (dari sesi login). Dimuat saat tab dibuka / rentang diganti / ada pesanan baru, tidak ikut polling.
 - File baru: `pelanggan/js/bot-daily.js` (teks 5 bahasa).
 
+## 22. Pelanggan bisa membatalkan order sendiri — jalankan `migrations/004_cu_cancel_order.sql` (setelah 001)
+- Berlaku untuk order yang **masih menunggu**: Bot / Bulk Order, Pesanan Baru / Perpanjang, Koin Hayday / Voucher / Katalog, Pre Order, Supply & Stock, Top Up Koin. Tombol **✖ Batalkan** + dialog konfirmasi (juga untuk request langganan).
+- Status menjadi **cancelled** (data TIDAK dihapus; dulu batal Perpanjang / Supply / Top Up menghapus baris). Koin yang dipotong dan jatah kode referal dikembalikan otomatis.
+- Dicek di database (`cu_cancel_order`): hanya pemilik (dari sesi login) dan hanya status pending. Mode "lihat sebagai pelanggan" admin tidak bisa membatalkan.
+- Admin: filter / label **🚫 Dibatalkan** di Bot Order, Bulk Order, Koin Hayday, Voucher, Supply, Pre Order, Top Up Koin, Perpanjangan, dan Supply & Stock → Order Masuk. Order batal tidak bisa di-ACC / dikirim, dan tagarnya tidak pernah masuk Batch Tagar.
+- Farm / HAV Token tidak bisa dibatalkan (langsung terkirim otomatis saat dibayar).
+

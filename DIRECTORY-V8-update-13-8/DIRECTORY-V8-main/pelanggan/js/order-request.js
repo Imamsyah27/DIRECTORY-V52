@@ -84,8 +84,10 @@ document.addEventListener("click", async (e) => {
     const b = e.target.closest("[data-reqorder]"); if (b) { openOrderRequestModal(Number(b.dataset.reqorder)); return; }
     const c = e.target.closest("[data-reqcancel]");
     if (c) {
-        const { error } = await cuRpc("cu_cancel_order_request", { p_id: Number(c.dataset.reqcancel) });
-        if (error) { showToast(translateServerError(error.message || "") || t("rn_err_generic"), "danger"); return; }
-        showToast(t("rq_cancelled_ok"), "success"); await loadOrderRequests(); renderOrders();
+        cuConfirm({ title: t("rq_cancel_title"), body: escapeHtml(t("co_cancel_body")), onYes: async () => {
+            const { error } = await cuRpc("cu_cancel_order_request", { p_id: Number(c.dataset.reqcancel) });
+            if (error) { showToast(translateServerError(error.message || "") || t("rn_err_generic"), "danger"); return; }
+            showToast(t("rq_cancelled_ok"), "success"); await loadOrderRequests(); renderOrders();
+        } });
     }
 });

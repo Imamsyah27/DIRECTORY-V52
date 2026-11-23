@@ -228,8 +228,8 @@ function renderRenewalList() {
         ? `📲 ${escapeHtml(t("rn_banner", { n: pend.length, wa: ADMIN_WA_DISPLAY }))} <button type="button" class="btn btn-wa mini-wa" data-contact-text="">💬 ${escapeHtml(t("rn_wa_chat"))}</button>` : "";
     $("rnEmpty").style.display = myRenewals.length ? "none" : "block";
 
-    const stCls = { pending: "badge-wait", approved: "badge-done", rejected: "badge-danger" };
-    const stIco = { pending: "⏳", approved: "✅", rejected: "✖" };
+    const stCls = { pending: "badge-wait", approved: "badge-done", rejected: "badge-danger", cancelled: "badge-danger" };
+    const stIco = { pending: "⏳", approved: "✅", rejected: "✖", cancelled: "🚫" };
     box.innerHTML = myRenewals.map(r => `
         <div class="rn-card ${r.status}">
             <div class="rn-card-top">
@@ -261,7 +261,7 @@ function askCancelRenewal(id) {
         closeModal();
         if (error) { showToast(t("rn_err_generic"), "danger"); return; }
         showToast(t("rn_cancelled_ok"), "success");
-        loadRenewals();
+        loadRenewals(); if (typeof loadCoin === "function") loadCoin();    // koin yang dipotong dikembalikan server
     });
 }
 

@@ -206,10 +206,11 @@ function renderSupplyOrders() {
     $("supplyOrdersTable").style.display = mySupplyOrders.length ? "table" : "none";
     $("supplyOrdersBody").innerHTML = mySupplyOrders.map(o => `
         <tr><td>${fmtDate(o.created_at)}</td><td><b>${escapeHtml(o.item || o.nama)}</b></td><td>${fmtNum(o.qty)} ${escapeHtml(o.satuan)}${o.harga_total ? `<div class="cell-sub">🪙 ${fmtNum(o.harga_total)}</div>` : ""}</td>
-        <td><span class="badge ${o.status === "sent" ? "badge-done" : o.status === "rejected" ? "badge-bad" : "badge-proses"}">${o.status === "sent" ? "✅ " + escapeHtml(t("supply_status_sent")) : o.status === "rejected" ? "✖ " + escapeHtml(t("supply_status_rejected")) : "⏳ " + escapeHtml(t("supply_status_pending"))}</span></td>
-        <td>${o.status === "pending" ? `<button type="button" class="btn btn-ghost mini" onclick="cancelOrder(${o.id})">${escapeHtml(t("supply_cancel"))}</button>` : ""}</td></tr>`).join("");
+        <td><span class="badge ${o.status === "sent" ? "badge-done" : o.status === "rejected" || o.status === "cancelled" ? "badge-bad" : "badge-proses"}">${o.status === "sent" ? "✅ " + escapeHtml(t("supply_status_sent")) : o.status === "rejected" ? "✖ " + escapeHtml(t("supply_status_rejected")) : o.status === "cancelled" ? "🚫 " + escapeHtml(t("supply_status_cancelled")) : "⏳ " + escapeHtml(t("supply_status_pending"))}</span></td>
+        <td>${o.status === "pending" && typeof cuCancelBtn === "function" ? cuCancelBtn("supply", o.id, o.harga_total) : ""}</td></tr>`).join("");
 }
-async function cancelOrder(id) { const { error } = await cuRpc("cu_cancel_supply_order", { p_id: id }); if (!error) loadSupply(); }
+/* batal pesanan supply: lewat dialog konfirmasi (js/cancel-order.js) */
+function cancelOrder(id) { const o = mySupplyOrders.find(x => x.id === id); cuAskCancel("supply", id, o ? o.harga_total : 0); }
 
 /* ---------------- Arsip pribadi + grafik (dipanggil dashboard.js) ---------------- */
 async function onOrdersLoaded() {

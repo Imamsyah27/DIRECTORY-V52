@@ -148,7 +148,7 @@ function renderBotOrders() {
 
     const list = myBotOrders.filter(r => match(r, botFilter));
     $("botEmpty").style.display = list.length ? "none" : "block";
-    const stl = { pending: "bo_st_pending", kirim: "bo_st_kirim", sent: "bo_st_sent", rejected: "bo_st_rejected" };
+    const stl = { pending: "bo_st_pending", kirim: "bo_st_kirim", sent: "bo_st_sent", rejected: "bo_st_rejected", cancelled: "co_st_cancelled" };
     box.innerHTML = list.map(r => { const k = botState(r), open = botTagOpen.has(r.id), bi = botBatchInfo[r.id];
         const partial = bi && k === "kirim" && bi.sent > 0 && bi.sent < bi.total;
         const stText = partial ? t("bb_partial", { a: bi.sent, b: bi.total }) : t(stl[k] || "bo_st_pending"); return `
@@ -156,7 +156,7 @@ function renderBotOrders() {
             <div class="bo-item-sub">${r.dashboard === "BULK" ? `BEM ${r.n_bem} · SEM ${r.n_sem} · LEM ${r.n_lem}` : escapeHtml(r.tagar_pertama || "") + (r.jumlah > 1 ? " …" : "")} · ${fmt(r.created_at, false)}</div>
             ${r.dikirim_at ? `<div class="bo-item-sub">${escapeHtml(t("bo_sent_on", { d: fmt(r.dikirim_at, true) }))}</div>` : ""}
             ${r.catatan_admin ? `<div class="bo-item-sub">💬 ${escapeHtml(r.catatan_admin)}</div>` : ""}${botBatchHtml(r)}</div>
-            <div style="text-align:right;"><b>${fmtRp(r.total_harga)}</b><div class="bo-item-sub bo-st">${escapeHtml(stText)}</div></div></div>${open ? botTagsPanel(r) : ""}`; }).join("");
+            <div style="text-align:right;"><b>${fmtRp(r.total_harga)}</b><div class="bo-item-sub bo-st">${escapeHtml(stText)}</div>${r.status === "pending" && !r.arsip && typeof cuCancelBtn === "function" ? cuCancelBtn("bot", r.id, r.total_harga) : ""}</div></div>${open ? botTagsPanel(r) : ""}`; }).join("");
 }
 function botTagsPanel(r) {
     const d = botTagCache[r.id];

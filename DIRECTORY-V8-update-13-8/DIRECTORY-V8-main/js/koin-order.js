@@ -49,7 +49,7 @@ function kmRender() {
     kmEl("kmFilter").querySelectorAll("button").forEach(b => { b.classList.toggle("on", b.dataset.f === kmFilter); b.querySelector("i").textContent = cnt(b.dataset.f); });
     const rows = kmAll.filter(r => kmFilter === "all" || r.status === kmFilter);
     kmEl("kmEmpty").style.display = rows.length ? "none" : "block";
-    const pill = { pending: ["⏳ Menunggu ACC", "bp-pill mn"], approved: ["✅ Disetujui", "bp-pill rq"], rejected: ["✖ Ditolak", "bp-pill mn"] };
+    const pill = { pending: ["⏳ Menunggu ACC", "bp-pill mn"], approved: ["✅ Disetujui", "bp-pill rq"], rejected: ["✖ Ditolak", "bp-pill mn"], cancelled: ["🚫 Dibatalkan pelanggan", "bp-pill mn"] };
     kmEl("kmBody").innerHTML = rows.map(r => {
         const st = pill[r.status] || [r.status, "bp-pill mn"], wa = String(r.whatsapp || "").replace(/[^0-9]/g, "");
         const usd = kmRate ? `<div class="cell-sub">≈ ${(r.jumlah / kmRate).toLocaleString("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDT</div>` : "";

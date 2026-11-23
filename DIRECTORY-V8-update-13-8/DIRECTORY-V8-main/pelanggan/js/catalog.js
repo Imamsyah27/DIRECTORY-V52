@@ -298,18 +298,19 @@ function showDelivered(o) {
 function renderMyCatOrders() {
     const box = $("catMyOrders"); if (!box) return;
     if (!myCatOrders.length && !myFarmSales.length && !myHavSales.length && !myPreOrders.length) { box.innerHTML = ""; return; }
-    const stl = { pending: "cat_st_pending", done: "cat_st_done", rejected: "cat_st_rejected" };
+    const stl = { pending: "cat_st_pending", done: "cat_st_done", rejected: "cat_st_rejected", cancelled: "co_st_cancelled" };
+    const cancelBtn = (kind, o, refund) => o.status === "pending" && typeof cuCancelBtn === "function" ? cuCancelBtn(kind, o.id, refund) : "";
     const loc = numLocale(), day = iso => new Date(iso).toLocaleDateString(loc, { day: "2-digit", month: "short" });
     const sale = (cls, s, lines, copyAttr) => `<details class="bo-item ${cls}"><summary><b>${escapeHtml(s.batch_nama)}</b> × ${fmtNum(s.qty)} <span class="bo-item-sub">· 🪙 ${fmtNum(s.total)} · ${day(s.created_at)}</span></summary>
             <textarea class="ct-msg" rows="${Math.min(6, lines.length + 1)}" readonly>${escapeHtml(lines.join("\n"))}</textarea>
             <button type="button" class="btn btn-ghost mini" ${copyAttr} style="margin-top:6px;">📋 ${escapeHtml(t("farm_copy_all"))}</button></details>`;
     box.innerHTML = `<div class="panel bo-panel"><div class="panel-title">🧾 ${escapeHtml(t("cat_hist_title"))}</div>
         ${myCatOrders.length ? `<div class="rn-label" style="margin:2px 0;">🛍 ${escapeHtml(t("cat_my_orders"))}</div>` + myCatOrders.map(o => `<div class="bo-item"><div><b>${escapeHtml(o.item_nama)}</b> × ${fmtNum(o.qty)}<div class="bo-item-sub">${day(o.created_at)}${o.catatan_admin ? " · 💬 " + escapeHtml(o.catatan_admin) : ""}</div></div>
-            <div style="text-align:right;"><b>🪙 ${fmtNum(o.total)}</b><div class="bo-item-sub">${escapeHtml(t(stl[o.status] || "cat_st_pending"))}</div></div></div>`).join("") : ""}
+            <div style="text-align:right;"><b>🪙 ${fmtNum(o.total)}</b><div class="bo-item-sub">${escapeHtml(t(stl[o.status] || "cat_st_pending"))}</div>${cancelBtn("catalog", o, o.total)}</div></div>`).join("") : ""}
         ${myFarmSales.length ? `<div class="rn-label" style="margin:10px 0 2px;">🌱 ${escapeHtml(t("farm_my"))}</div>` + myFarmSales.map(s => sale("farm-sale", s, s.tokens.map(farmLine), `data-farm-copy="${s.id}"`)).join("") : ""}
         ${myPreOrders.length ? `<div class="rn-label" style="margin:10px 0 2px;">📝 ${escapeHtml(t("po_my"))}</div>` + myPreOrders.map(o => `<details class="bo-item po-sale"><summary><b>${escapeHtml(o.item_nama)}</b> · ${escapeHtml(t("po_batch_of", { a: o.batch_no, b: o.batch_total }))} <span class="bo-item-sub">· ${escapeHtml(t("po_items", { n: fmtNum(o.total_barang) }))} · 🪙 ${fmtNum(o.total_koin)} · ${day(o.created_at)} · ${escapeHtml(t(stl[o.status] || "cat_st_pending"))}${o.catatan_admin ? " · 💬 " + escapeHtml(o.catatan_admin) : ""}</span></summary>
             <textarea class="ct-msg" rows="${Math.min(8, o.lines.length + 1)}" readonly>${escapeHtml(o.lines.map(l => `${l.tagar} | ${l.jumlah}`).join("\n"))}</textarea>
-            <button type="button" class="btn btn-ghost mini" data-po-copy="${o.id}" style="margin-top:6px;">📋 ${escapeHtml(t("po_copy"))}</button></details>`).join("") : ""}
+            <button type="button" class="btn btn-ghost mini" data-po-copy="${o.id}" style="margin-top:6px;">📋 ${escapeHtml(t("po_copy"))}</button> ${cancelBtn("preorder", o, o.total_koin)}</details>`).join("") : ""}
         ${myHavSales.length ? `<div class="rn-label" style="margin:10px 0 2px;">🔑 ${escapeHtml(t("hav_my"))}</div>` + myHavSales.map(s => sale("hav-sale", s, s.keys, `data-hav-copy="${s.id}"`)).join("") : ""}</div>`;
 }
 

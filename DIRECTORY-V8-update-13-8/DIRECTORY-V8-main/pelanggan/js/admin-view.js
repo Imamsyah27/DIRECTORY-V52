@@ -6,7 +6,7 @@
     if (!isAdminView()) return;
 
     // Mode lihat saja: aksi yang mengubah data pelanggan diblokir di browser
-    const BLOCK = new Set(["cu_place_supply_order", "cu_place_supply_order_k", "cu_order_catalog_k", "cu_cancel_supply_order", "cu_request_renewal", "cu_request_new_order", "cu_request_renewal_k", "cu_request_order_action", "cu_cancel_order_request", "cu_request_new_order_k", "cu_cancel_renewal", "customer_set_order_label", "customer_change_password", "cu_archive_mark_seen", "cu_request_bot_order", "cu_request_bulk_order", "cu_buy_farm", "cu_buy_hav", "cu_order_catalog", "cu_place_preorder"]);
+    const BLOCK = new Set(["cu_place_supply_order", "cu_place_supply_order_k", "cu_order_catalog_k", "cu_cancel_supply_order", "cu_request_renewal", "cu_request_new_order", "cu_request_renewal_k", "cu_request_order_action", "cu_cancel_order_request", "cu_request_new_order_k", "cu_cancel_renewal", "cu_cancel_order", "cu_cancel_topup", "customer_set_order_label", "customer_change_password", "cu_archive_mark_seen", "cu_request_bot_order", "cu_request_bulk_order", "cu_buy_farm", "cu_buy_hav", "cu_order_catalog", "cu_place_preorder"]);
     const _rpc = supabaseClient.rpc.bind(supabaseClient);
     const pendingErrs = [];
     const showErr = (name, msg) => {

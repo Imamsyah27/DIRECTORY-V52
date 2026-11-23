@@ -270,9 +270,9 @@ async function spLoadOrders() {
     spEl("spOrderBody").innerHTML = spOrders.map((o, i) => `
         <tr><td class="col-no">${i + 1}</td><td>${spWaktu(o.created_at)}</td><td><b>${escapeHtml(o.username)}</b>${spContactHtml(o)}</td>
         <td>${escapeHtml(o.item || o.batch)}</td><td class="num"><b>${spNum(o.qty)}</b> ${escapeHtml(o.satuan)}${o.harga_total ? `<div class="cell-sub">🪙 ${spNum(o.harga_total)}</div>` : ""}</td>
-        <td>${o.status === "sent" ? `<span class="badge badge-done">✅ Terkirim</span> <span class="cell-sub">${spWaktu(o.sent_at)}</span>` : o.status === "rejected" ? `<span class="badge badge-bad">✖ Ditolak</span>` : `<span class="badge badge-proses">⏳ Menunggu</span>`}</td>
+        <td>${o.status === "sent" ? `<span class="badge badge-done">✅ Terkirim</span> <span class="cell-sub">${spWaktu(o.sent_at)}</span>` : o.status === "rejected" ? `<span class="badge badge-bad">✖ Ditolak</span>` : o.status === "cancelled" ? `<span class="badge badge-bad">🚫 Dibatalkan pelanggan</span>` : `<span class="badge badge-proses">⏳ Menunggu</span>`}</td>
         <td class="col-aksi"><div class="actions-cell">
-            ${o.status === "rejected" ? "" : o.status === "sent"
+            ${o.status === "rejected" || o.status === "cancelled" ? "" : o.status === "sent"
                 ? `<button class="btn btn-ghost btn-icon" title="Batalkan centang" onclick="spSetSent(${o.id}, false)">↩️</button>`
                 : `<button class="btn btn-success btn-icon" title="Tandai sudah dikirim" onclick="spSetSent(${o.id}, true)">✅</button>`}
             <button class="btn btn-danger btn-icon" title="Hapus order" onclick="spDeleteOrder(${o.id})">🗑</button>

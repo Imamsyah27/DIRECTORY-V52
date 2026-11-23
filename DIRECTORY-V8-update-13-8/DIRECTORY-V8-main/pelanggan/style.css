@@ -301,4 +301,6 @@ body{
 .bd-num{ text-align:end; white-space:nowrap; } .bd-num small{ display:block; font-size:11px; color:var(--text-secondary); }
 .bd-empty{ padding:14px 0; text-align:center; color:var(--text-secondary); font-size:13px; }
 .bd-note{ margin-top:8px; font-size:11.5px; color:var(--text-secondary); }
+/* Batal order (pelanggan) */
+.co-cancel{ margin-top:6px; color:#dc2626; border-color:rgba(220,38,38,.35); }
 
