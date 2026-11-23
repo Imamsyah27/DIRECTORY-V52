@@ -4,7 +4,8 @@
  * "Tandai sudah dikirim" = tagar keluar dari batch dan slotnya langsung diisi tagar pending berikutnya (tanpa reload).
  * Tagar terkirim tampil di panel "Sudah dikirim" sampai diarsipkan.
  */
-const BB = { size: 50, pending: 0, archived: 0, entries: [], sent: [], orders: [], pkg: "BEM", loaded: false, bound: false, busy: false };
+const BB = { size: 50, pending: 0, archived: 0, entries: [], sent: [], orders: [], pkg: "BEM", loaded: false, bound: false, busy: false,
+    daily: { days: 7, rows: null, at: 0, loading: false, missing: false } };   // total tagar per hari (bot_daily_admin, migrasi 006)
 const bbPin = () => sessionStorage.getItem("akun_admin_pin");
 const bbNum = n => Number(n || 0).toLocaleString("id-ID");
 const bbRp = n => "Rp " + bbNum(n);
@@ -30,6 +31,33 @@ async function bbInit() {
     if (!Array.isArray(data.sent)) { showToast("Jalankan dulu migrations/001_bot_queue_status.sql di Supabase SQL Editor", "danger"); return; }
     Object.assign(BB, { size: data.size, pending: data.pending, archived: data.archived || 0, entries: data.entries || [], sent: data.sent || [], orders: data.orders || [], loaded: true });
     bbRender();
+    // total per hari: dimuat saat tab dibuka, lalu paling sering 1x per 5 menit (tidak ikut setiap perubahan batch)
+    if (!BB.daily.missing && Date.now() - BB.daily.at > 5 * 60000) bbLoadDaily();
+}
+async function bbLoadDaily() {
+    if (BB.daily.loading) return;
+    BB.daily.loading = true;
+    const { data, error } = await supabaseClient.rpc("bot_daily_admin", { p_pin: bbPin(), p_days: BB.daily.days });
+    BB.daily.loading = false;
+    if (error) {
+        if (/does not exist|schema cache|Could not find the function/i.test(error.message || "")) BB.daily.missing = true;   // migrasi 006 belum dijalankan: panel disembunyikan
+        else showToast("Gagal memuat total tagar per hari", "danger");
+        bbRender(); return;
+    }
+    BB.daily.rows = data || []; BB.daily.at = Date.now(); bbRender();
+}
+function bbDailyHtml() {
+    const d = BB.daily; if (d.missing) return "";
+    const rows = d.rows || [], tot = k => rows.reduce((a, r) => a + Number(r[k] || 0), 0);
+    const day = iso => new Date(iso + "T00:00:00").toLocaleDateString("id-ID", { weekday: "short", day: "2-digit", month: "short" });
+    const cell = (r, k) => `<td class="num${BB.pkg.toLowerCase() === k ? " bb-cur" : ""}">${bbNum(r[k])}</td>`;
+    return `<section class="panel table-section"><div class="panel-title">📊 Total Tagar per Hari <span class="panel-hint">semua pelanggan · tanggal pesan (WIB) · ditolak / dibatalkan tidak dihitung · tagar Bulk dihitung ke jenisnya</span></div>
+        <div class="hold-tabs">${[7, 14, 30].map(n => `<button type="button" data-bbdays="${n}" class="${d.days === n ? "on" : ""}" ${d.loading ? "disabled" : ""}>${n} hari</button>`).join("")}</div>
+        ${d.rows === null ? `<div class="rn-empty" style="display:block;">Memuat…</div>` : `<div class="table-wrap"><table style="min-width:520px;"><thead><tr><th>Tanggal</th><th class="num">BEM</th><th class="num">SEM</th><th class="num">LEM</th><th class="num">Total tagar</th><th class="num">Pesanan</th></tr></thead><tbody>
+            ${rows.map(r => `<tr class="${Number(r.bem) + Number(r.sem) + Number(r.lem) ? "" : "bb-zero"}"><td>${day(r.tanggal)}</td>${cell(r, "bem")}${cell(r, "sem")}${cell(r, "lem")}<td class="num"><b>${bbNum(Number(r.bem) + Number(r.sem) + Number(r.lem))}</b></td><td class="num">${bbNum(r.pesanan)}</td></tr>`).join("")}
+            <tr class="bb-total"><td><b>Total ${d.days} hari</b></td><td class="num"><b>${bbNum(tot("bem"))}</b></td><td class="num"><b>${bbNum(tot("sem"))}</b></td><td class="num"><b>${bbNum(tot("lem"))}</b></td><td class="num"><b>${bbNum(tot("bem") + tot("sem") + tot("lem"))}</b></td><td class="num"><b>${bbNum(tot("pesanan"))}</b></td></tr>
+        </tbody></table></div>`}
+    </section>`;
 }
 /* batch dihitung dari tagar PENDING saja: posisi ke-1..size = Batch 1, dst. */
 const bbBatches = pkg => {
@@ -44,7 +72,7 @@ function bbRender() {
     const all = BB.entries, pkgCount = p => all.filter(e => e.dashboard === p).length;
     const batches = bbBatches(BB.pkg), sentPkg = BB.sent.filter(e => e.dashboard === BB.pkg);
     pane.innerHTML = `
-    <section class="panel table-section"><div class="panel-title">📋 Batch Tagar Bot <span class="panel-hint">hanya tagar yang BELUM dikirim, dibagi per batch (urutan = urutan di-ACC)</span></div>
+    <section class="panel table-section"><div class="panel-title">📋 Batch Tagar Bot <span class="panel-hint">hanya tagar yang BELUM dikirim · batch dihitung terpisah per jenis BEM / SEM / LEM (tagar Bulk masuk ke jenisnya) · urutan = urutan di-ACC</span></div>
         <div class="bb-stats">
             <div><span>Belum terkirim</span><b>${bbNum(all.length)}</b></div>
             <div><span>Sudah dikirim (belum diarsip)</span><b>${bbNum(BB.sent.length)}</b></div>
@@ -81,7 +109,8 @@ function bbRender() {
             <td>${o.n_sent ? `<small>sebagian sudah dikirim — tidak bisa dibatalkan</small>` : `<button type="button" class="btn btn-danger mini" data-bbcancel="${o.id}">✖ Batalkan & kembalikan koin</button>`}</td></tr>`).join("")}
         </tbody></table></div>
         ${BB.orders.length ? "" : `<div class="rn-empty" style="display:block;">Tidak ada pesanan aktif.</div>`}
-    </section>`;
+    </section>
+    ${bbDailyHtml()}`;
     if (!BB.bound) { BB.bound = true; pane.addEventListener("click", bbOnClick); }
 }
 const bbWaktu = iso => iso ? new Date(iso).toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "-";
@@ -105,6 +134,7 @@ async function bbCopy(text, label) {
 }
 async function bbOnClick(e) {
     const pk = e.target.closest("[data-bbpkg]"); if (pk) { BB.pkg = pk.dataset.bbpkg; bbRender(); return; }
+    const dd = e.target.closest("[data-bbdays]"); if (dd) { if (!BB.daily.loading) { BB.daily.days = Number(dd.dataset.bbdays); bbLoadDaily(); } return; }
     const det = e.target.closest("details[data-bbdet]");
     if (det && e.target.closest("summary")) { bbCardHtml.open = bbCardHtml.open || new Set(); const k = det.dataset.bbdet; setTimeout(() => { if (det.open) bbCardHtml.open.add(k); else bbCardHtml.open.delete(k); }, 0); return; }
     const c = e.target.closest("[data-bbcopy]");

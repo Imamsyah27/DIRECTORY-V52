@@ -8,7 +8,7 @@ Object.assign(TRANSLATIONS.id, {
     bk_tags_hint: "Satu tagar per baris atau pisahkan dengan koma. Kosongkan paket yang tidak dipesan.", bk_note: "Catatan untuk admin (opsional)",
     bk_total_tags: "Total tagar", bk_tier: "Tier harga", bk_total: "Total", bk_tiers: "Daftar harga per tagar", bk_tag_range: "{a}–{b} tagar",
     bk_none: "Isi tagar untuk melihat total harga.", bk_unset: "Harga Bulk Order belum diatur admin.", bk_off: "Bulk Order sedang tidak tersedia.",
-    bk_send: "Lanjut ke Pembayaran", bk_sent_title: "Bulk Order Terkirim", bk_sent_text: "Pesanan {n} tagar sebesar {total} sudah masuk antrian admin.",
+    bk_send: "Pesan", bk_sent_title: "Bulk Order Terkirim", bk_sent_text: "Pesanan {n} tagar sebesar {total} sudah masuk antrian admin.",
     bk_err_empty: "Isi minimal 1 tagar", bk_err_max: "Bulk Order maksimal 100 tagar per pesanan", bk_err_price: "Harga Bulk Order belum diatur admin",
     bk_wa_text: "Halo Admin, saya sudah membayar Bulk Order ({n} tagar) sebesar {total}. Berikut bukti pembayarannya:",
     bk_line: "{pkg}: {n} × {p}", bk_label: "Bulk"
@@ -18,7 +18,7 @@ Object.assign(TRANSLATIONS.en, {
     bk_tags_hint: "One tag per line or separate with commas. Leave a package empty if you do not need it.", bk_note: "Note for admin (optional)",
     bk_total_tags: "Total tags", bk_tier: "Price tier", bk_total: "Total", bk_tiers: "Price per tag list", bk_tag_range: "{a}–{b} tags",
     bk_none: "Enter tags to see the total price.", bk_unset: "Bulk Order price has not been set by the admin.", bk_off: "Bulk Order is currently unavailable.",
-    bk_send: "Continue to Payment", bk_sent_title: "Bulk Order Sent", bk_sent_text: "Your order of {n} tags totaling {total} is now in the admin queue.",
+    bk_send: "Order", bk_sent_title: "Bulk Order Sent", bk_sent_text: "Your order of {n} tags totaling {total} is now in the admin queue.",
     bk_err_empty: "Enter at least 1 tag", bk_err_max: "Bulk Order allows at most 100 tags per order", bk_err_price: "Bulk Order price has not been set by the admin",
     bk_wa_text: "Hello Admin, I have paid for Bulk Order ({n} tags), total {total}. Here is my payment proof:",
     bk_line: "{pkg}: {n} × {p}", bk_label: "Bulk"
@@ -80,7 +80,7 @@ async function openBulkOrderModal() {
         if (c.n > info.max) { showToast(t("bk_err_max"), "danger"); return; }
         if (c.unset || c.total <= 0) { showToast(t("bk_err_price"), "danger"); return; }
         const note = $("bkNote").value.trim();
-        if (!(await payStep({ pkg: "BEM", jumlah: c.n, total: c.total,
+        if (!(await coinConfirm({ pkg: "BEM", jumlah: c.n, total: c.total,
             lines: [[t("bk_label"), t("bo_tags_n", { n: c.n })], ...c.rows.map(([p, k, pr]) => [p, `${k} × ${fmtRp(pr)}`])],
             waText: (tot) => t("bk_wa_text", { n: c.n, total: tot }) }))) return;
         const btn = $("bkYes"); btn.disabled = true; btn.textContent = t("bo_sending");

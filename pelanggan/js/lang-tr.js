@@ -256,9 +256,9 @@ TRANSLATIONS.tr = Object.assign(TRANSLATIONS.tr || {}, {
     bo_calc: "{n} etiket × {p}",
     bo_total: "Toplam",
     bo_unset: "Bot siparişi fiyatı henüz yönetici tarafından belirlenmedi.",
-    bo_send: "Ödemeye Geç",
+    bo_send: "Sipariş ver",
     bo_sending: "Gönderiliyor…",
-    bo_info: "Ödemeniz onaylandıktan sonra siparişiniz, yönetici işleme alana kadar Onay Bekliyor durumunda kalır.",
+    bo_info: "Evet'e bastığınızda jeton düşülür. Sipariş yönetici onayını bekler; reddedilir veya iptal edilirse jetonlar iade edilir.",
     bo_sent_title: "Bot Siparişi Gönderildi",
     bo_sent_text: "{n} etiketlik ({pkg}) {total} tutarındaki siparişiniz yönetici sırasına girdi.",
     bo_close: "Kapat",
@@ -461,4 +461,22 @@ Object.assign(TRANSLATIONS.tr, {
     po_items: "{n} ürün",
     po_copy: "Etiket | miktar kopyala",
     po_saved_hist: "Satın Alma Geçmişi → Ön Siparişlerim bölümüne de kaydedildi."
+});
+
+/* Bot Order: konfirmasi koin (Ya / Tidak), pencarian tagar, jenis BEM / SEM / LEM */
+Object.assign(TRANSLATIONS.tr, {
+    cc_title: "Siparişi Onayla",
+    cc_sub: "Sipariş verilsin mi? Bakiyenizden 🪙 {n} jeton düşülecek.",
+    cc_yes: "Evet, sipariş ver",
+    cc_no: "Hayır",
+    cc_short_title: "Jeton yetersiz",
+    cc_short_sub: "🪙 {n} jeton eksik. Önce yükleme yapın, sonra tekrar sipariş verin.",
+    bo_search_ph: "Siparişlerinizde etiket arayın…",
+    bo_search_n: "Bu etiketi içeren {n} sipariş",
+    bo_search_none: "Etiket siparişlerinizde bulunamadı.",
+    bo_search_loading: "Etiketler yükleniyor…",
+    bo_search_err: "Etiketler yüklenemedi, tekrar deneyin.",
+    bo_pkg_label: "Tür",
+    bk_send: "Sipariş ver",
+    bo_pkg_tags: "{pkg}: {n} etiket"
 });

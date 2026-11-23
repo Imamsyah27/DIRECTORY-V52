@@ -190,7 +190,7 @@ function askOrder(batchId, pfx) {
         const ct = readContactTagar("ord"); if (!ct) return;          // kontak + tagar WAJIB (dicek sebelum pembayaran koin)
         $("ordYes").disabled = true;
         if (total) {   // bayar dengan koin (saldo kurang = tidak bisa memesan)
-            const paid = await payStep({ pkg: "SUPPLY", total, waText: tot => t("supply_wa", { q: fmtNum(q), u: s.satuan, i: s.item || s.nama, total: tot }) });
+            const paid = await coinConfirm({ pkg: "SUPPLY", total, waText: tot => t("supply_wa", { q: fmtNum(q), u: s.satuan, i: s.item || s.nama, total: tot }) });
             if (!paid) { $("ordYes").disabled = false; return; }
         }
         const catatan = $("ordNote").value.trim();

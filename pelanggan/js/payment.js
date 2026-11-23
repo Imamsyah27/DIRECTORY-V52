@@ -106,6 +106,50 @@ function coinPayOverlay(total, saldo, opts) {
     });
 }
 
+/**
+ * KONFIRMASI KOIN (semua pesanan berbayar koin KECUALI langganan harian — Pesan Baru / Perpanjang tetap memakai payStep).
+ * Koin cukup  -> dialog singkat "Yakin memesan?" Ya / Tidak (tanpa layar pembayaran). Ya = lanjut kirim pesanan
+ *               (koin dipotong server, pesanan menunggu ACC admin seperti biasa).
+ * Koin kurang -> dialog kekurangan + tombol Top Up; pesanan tidak dibuat.
+ * Sistem koin belum dipasang -> alur lama (legacyPayStep).
+ * Mengembalikan Promise<boolean>: true = lanjut kirim pesanan.
+ */
+async function coinConfirm(opts) {
+    const coin = typeof loadCoin === "function" ? await loadCoin() : null;      // saldo terbaru (1 request kecil)
+    if (!coin) return legacyPayStep(opts);
+    const total = await _payTotal(opts);
+    if (total <= 0) return true;
+    return coinConfirmDialog(total, Number(coin.koin) || 0, opts || {});
+}
+function coinConfirmDialog(total, saldo, opts) {
+    return new Promise(resolve => {
+        const ov = document.createElement("div"); ov.className = "pay-overlay";
+        const enough = saldo >= total, num = n => Number(n).toLocaleString(numLocale());
+        const extra = (opts.lines || []).map(([k, v]) => `<div class="coin-line"><span>${escapeHtml(k)}</span><b>${escapeHtml(v)}</b></div>`).join("");
+        ov.innerHTML = `<div class="pay-box cc-box" role="dialog" aria-modal="true">
+            <div class="cc-icon ${enough ? "" : "bad"}">${enough ? "🛒" : "🪙"}</div>
+            <div class="modal-title">${escapeHtml(t(enough ? "cc_title" : "cc_short_title"))}</div>
+            <div class="modal-sub">${escapeHtml(enough ? t("cc_sub", { n: num(total) }) : t("cc_short_sub", { n: num(total - saldo) }))}</div>
+            <div class="coin-lines">
+                ${extra}
+                <div class="coin-line"><span>${escapeHtml(t("coin_total"))}</span><b>🪙 ${num(total)}</b></div>
+                <div class="coin-line ${enough ? "ok" : "bad"}"><span>${escapeHtml(t(enough ? "coin_after" : "coin_missing"))}</span><b>🪙 ${num(Math.abs(saldo - total))}</b></div>
+            </div>
+            ${enough && opts.note ? `<div class="pay-warn pay-note-info">${escapeHtml(opts.note)}</div>` : ""}
+            <div class="cc-actions">
+                <button type="button" class="btn btn-ghost" id="ccNo">${escapeHtml(t(enough ? "cc_no" : "coin_back"))}</button>
+                ${enough ? `<button type="button" class="btn btn-primary" id="ccYes">${escapeHtml(t("cc_yes"))}</button>`
+                         : `<button type="button" class="btn btn-primary" id="ccTopup">🪙 ${escapeHtml(t("coin_topup_btn"))}</button>`}
+            </div></div>`;
+        document.body.appendChild(ov);
+        const close = v => { ov.remove(); resolve(v); };
+        if (enough) ov.querySelector("#ccYes").addEventListener("click", () => close(true), { once: true });
+        // Top Up dibuka SETELAH form pemesan selesai merapikan tombolnya (form itu lalu digantikan modal Top Up)
+        else ov.querySelector("#ccTopup").addEventListener("click", () => { close(false); setTimeout(() => openTopupModal(total - saldo), 0); }, { once: true });
+        ov.querySelector("#ccNo").addEventListener("click", () => close(false), { once: true });
+    });
+}
+
 /* Alur lama (tanpa koin): metode bayar + kirim bukti ke admin */
 async function legacyPayStep({ pkg, hari, jumlah, kode, total: totalOverride, waText }) {
     const n = Math.max(1, jumlah || 1);

@@ -7,8 +7,8 @@ Object.assign(TRANSLATIONS.id, {
     bo_btn: "Pesan Bot Order", bo_title: "Pesan Bot Order", bo_sub: "Pilih paket bot dan masukkan tagar. Harga dihitung per tagar.",
     bo_pkg: "Paket Bot", bo_per_tag: "/tagar", bo_tags_label: "Tagar (boleh banyak)", bo_tags_hint: "Satu tagar per baris atau pisahkan dengan koma. Tagar kembar otomatis diabaikan.",
     bo_tag_ph: "#tagar1\n#tagar2\n#tagar3", bo_note_label: "Catatan untuk admin (opsional)", bo_price_title: "Harga", bo_calc: "{n} tagar × {p}", bo_total: "Total",
-    bo_unset: "Harga bot order belum diatur admin.", bo_send: "Lanjut ke Pembayaran", bo_sending: "Mengirim…",
-    bo_info: "Setelah pembayaran dikonfirmasi, pesanan Anda berstatus Menunggu Konfirmasi sampai admin memprosesnya.",
+    bo_unset: "Harga bot order belum diatur admin.", bo_send: "Pesan", bo_sending: "Mengirim…",
+    bo_info: "Koin dipotong saat Anda menekan Ya. Pesanan menunggu konfirmasi admin; bila ditolak atau dibatalkan, koin dikembalikan.",
     bo_sent_title: "Bot Order Terkirim", bo_sent_text: "Pesanan {n} tagar ({pkg}) sebesar {total} sudah masuk antrian admin.", bo_close: "Tutup",
     bo_err_tag: "Isi minimal 1 tagar", bo_err_max: "Maksimal 500 tagar per pesanan", bo_err_price: "Harga Bot Order belum diatur admin",
     bo_list_title: "Bot Order Saya", bo_st_pending: "⏳ Menunggu konfirmasi", bo_st_approved: "✅ Disetujui", bo_st_rejected: "✖ Ditolak", bo_tags_n: "{n} tagar",
@@ -18,8 +18,8 @@ Object.assign(TRANSLATIONS.en, {
     bo_btn: "Order Bot", bo_title: "Order Bot", bo_sub: "Choose a bot package and enter your tags. Priced per tag.",
     bo_pkg: "Bot Package", bo_per_tag: "/tag", bo_tags_label: "Tags (as many as you like)", bo_tags_hint: "One tag per line or separate with commas. Duplicate tags are ignored.",
     bo_tag_ph: "#tag1\n#tag2\n#tag3", bo_note_label: "Note for admin (optional)", bo_price_title: "Price", bo_calc: "{n} tags × {p}", bo_total: "Total",
-    bo_unset: "Bot order price has not been set by the admin.", bo_send: "Continue to Payment", bo_sending: "Sending…",
-    bo_info: "After your payment is confirmed, your order is marked Awaiting Confirmation until the admin processes it.",
+    bo_unset: "Bot order price has not been set by the admin.", bo_send: "Order", bo_sending: "Sending…",
+    bo_info: "Coins are deducted when you press Yes. The order awaits admin confirmation; if it is rejected or cancelled, the coins are refunded.",
     bo_sent_title: "Bot Order Sent", bo_sent_text: "Your order of {n} tags ({pkg}) totaling {total} is now in the admin queue.", bo_close: "Close",
     bo_err_tag: "Enter at least 1 tag", bo_err_max: "Maximum 500 tags per order", bo_err_price: "Bot order price has not been set by the admin",
     bo_list_title: "My Bot Orders", bo_st_pending: "⏳ Awaiting confirmation", bo_st_approved: "✅ Approved", bo_st_rejected: "✖ Rejected", bo_tags_n: "{n} tags",
@@ -87,7 +87,7 @@ async function openBotOrderModal() {
         if (tags.length > 500) { showToast(t("bo_err_max"), "danger"); return; }
         const total = p * tags.length;
 
-        if (!(await payStep({ pkg: st.pkg, jumlah: tags.length, total,
+        if (!(await coinConfirm({ pkg: st.pkg, jumlah: tags.length, total,
             waText: (tot) => t("bo_wa_text", { pkg: st.pkg + " Bot", n: tags.length, total: tot }) }))) return;
 
         const btn = $("boYes"); btn.disabled = true; btn.textContent = t("bo_sending");
@@ -108,6 +108,12 @@ async function openBotOrderModal() {
 
 /* ---------------- Daftar bot order pelanggan (tab "Bot Order") ---------------- */
 let myBotOrders = [], botFilter = "aktif", botKind = "all";   // botKind: all | bot | bulk (dipisah supaya tidak tertukar)
+let botPkg = "all";            // jenis: all | BEM | SEM | LEM (pesanan Bulk tampil di setiap jenis yang ada tagarnya)
+/* pencarian tagar MILIK SENDIRI: semua tagar diambil 1x saat mulai mencari (cu_my_bot_tags_all), lalu disaring di browser */
+let botQ = "", botAllTags = null, botAllTagsSig = null, botTagsLoading = null, botSearchTimer = null;
+const botNorm = v => String(v || "").trim().replace(/^#+/, "").toLowerCase();
+const botPkgKey = p => p.toLowerCase();                       // BEM -> bem (kolom n_bem / tagar per jenis)
+const botPkgOk = (r, p = botPkg) => p === "all" || r.dashboard === p || (r.dashboard === "BULK" && Number(r["n_" + botPkgKey(p)]) > 0);
 const botTagOpen = new Set(), botTagCache = {};   // daftar tagar lengkap dimuat hanya saat dibuka (seperti di dashboard admin)
 const botFlat = d => Array.isArray(d) ? d : [...(d.bem || []), ...(d.sem || []), ...(d.lem || [])];
 const botState = r => r.status === "approved" ? (r.dikirim_at ? "sent" : "kirim") : r.status;
@@ -116,6 +122,10 @@ async function loadBotOrders() {
     if (!$("botOrderList")) return;
     const { data, error } = await cuRpc("cu_my_bot_orders");
     myBotOrders = (!error && data) ? data : [];
+    // daftar tagar untuk pencarian dibuang bila pesanan berubah (diambil ulang hanya saat pelanggan mencari lagi)
+    const sig = myBotOrders.map(r => r.id + ":" + r.jumlah).join(",");
+    if (botAllTagsSig !== null && sig !== botAllTagsSig) { botAllTags = null; if (botQ) botEnsureTags(); }
+    botAllTagsSig = sig;
     if (!error && typeof botDailyOrdersChanged === "function") botDailyOrdersChanged(myBotOrders);   // total per hari ikut diperbarui bila ada pesanan baru
     // batch: tagar MILIK SENDIRI ada berapa di batch berapa (tanpa SQL 23 -> kosong, tampilan lama tetap jalan)
     const b = await cuRpc("cu_my_bot_batches");
@@ -139,23 +149,26 @@ function renderBotOrders() {
     const fmt = (iso, withTime) => new Date(iso).toLocaleString(loc, withTime ? { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" } : { day: "2-digit", month: "short" });
     const kindOk = r => botKind === "all" || (botKind === "bulk") === (r.dashboard === "BULK");
     document.querySelectorAll("#botKind button").forEach(b => b.classList.toggle("on", b.dataset.bk === botKind));
-    const match = (r, f) => kindOk(r) && (f === "all" ? true : f === "arsip" ? !!r.arsip : !r.arsip);
+    const match = (r, f) => kindOk(r) && botPkgOk(r) && (f === "all" ? true : f === "arsip" ? !!r.arsip : !r.arsip);
     document.querySelectorAll("#botFilter button").forEach(b => { b.classList.toggle("on", b.dataset.bf === botFilter); b.querySelector("i").textContent = myBotOrders.filter(r => match(r, b.dataset.bf)).length; });
+    document.querySelectorAll("#botPkg button").forEach(b => { b.classList.toggle("on", b.dataset.bp === botPkg); b.querySelector("i").textContent = myBotOrders.filter(r => kindOk(r) && botPkgOk(r, b.dataset.bp) && !r.arsip).length; });
 
     // badge tab: pesanan yang masih berjalan (menunggu / disetujui belum dikirim)
     const open = myBotOrders.filter(r => !r.arsip && (r.status === "pending" || botState(r) === "kirim")).length, bd = $("botTabBadge");
     if (bd) { bd.textContent = open; bd.style.display = open ? "inline-block" : "none"; }
 
-    const list = myBotOrders.filter(r => match(r, botFilter));
-    $("botEmpty").style.display = list.length ? "none" : "block";
+    // saat mencari: semua status (aktif & arsip) pada jenis yang dipilih
+    const list = botQ ? myBotOrders.filter(r => kindOk(r) && botPkgOk(r) && botHit(r)) : myBotOrders.filter(r => match(r, botFilter));
+    botSearchInfo(list.length);
+    $("botEmpty").style.display = list.length || botQ ? "none" : "block";
     const stl = { pending: "bo_st_pending", kirim: "bo_st_kirim", sent: "bo_st_sent", rejected: "bo_st_rejected", cancelled: "co_st_cancelled" };
     box.innerHTML = list.map(r => { const k = botState(r), open = botTagOpen.has(r.id), bi = botBatchInfo[r.id];
         const partial = bi && k === "kirim" && bi.sent > 0 && bi.sent < bi.total;
         const stText = partial ? t("bb_partial", { a: bi.sent, b: bi.total }) : t(stl[k] || "bo_st_pending"); return `
-        <div class="bo-item bo-s-${k}"><div><b>${r.dashboard === "BULK" ? "🧺 " + escapeHtml(t("bk_label")) : escapeHtml(r.dashboard) + " Bot"}</b> · <button type="button" class="bo-count" data-botags="${r.id}" aria-expanded="${open}" title="${escapeHtml(t("bo_tags_view"))}">${open ? "▾" : "▸"} ${escapeHtml(t("bo_tags_n", { n: r.jumlah }))}</button>${r.arsip ? ` <span class="bo-arch">🗂️ ${escapeHtml(t("bo_arch_tag"))}</span>` : ""}
+        <div class="bo-item bo-s-${k}"><div><b>${r.dashboard === "BULK" ? "🧺 " + escapeHtml(t("bk_label")) : escapeHtml(r.dashboard) + " Bot"}</b>${r.dashboard === "BULK" && botPkg !== "all" ? ` <span class="bo-pkgchip">${escapeHtml(t("bo_pkg_tags", { pkg: botPkg, n: r["n_" + botPkgKey(botPkg)] }))}</span>` : ""} · <button type="button" class="bo-count" data-botags="${r.id}" aria-expanded="${open}" title="${escapeHtml(t("bo_tags_view"))}">${open ? "▾" : "▸"} ${escapeHtml(t("bo_tags_n", { n: r.jumlah }))}</button>${r.arsip ? ` <span class="bo-arch">🗂️ ${escapeHtml(t("bo_arch_tag"))}</span>` : ""}
             <div class="bo-item-sub">${r.dashboard === "BULK" ? `BEM ${r.n_bem} · SEM ${r.n_sem} · LEM ${r.n_lem}` : escapeHtml(r.tagar_pertama || "") + (r.jumlah > 1 ? " …" : "")} · ${fmt(r.created_at, false)}</div>
             ${r.dikirim_at ? `<div class="bo-item-sub">${escapeHtml(t("bo_sent_on", { d: fmt(r.dikirim_at, true) }))}</div>` : ""}
-            ${r.catatan_admin ? `<div class="bo-item-sub">💬 ${escapeHtml(r.catatan_admin)}</div>` : ""}${botBatchHtml(r)}</div>
+            ${r.catatan_admin ? `<div class="bo-item-sub">💬 ${escapeHtml(r.catatan_admin)}</div>` : ""}${botBatchHtml(r)}${(() => { const h = botQ && botHit(r); return typeof h === "string" ? `<div class="bo-hit">🔎 ${escapeHtml(h)}</div>` : ""; })()}</div>
             <div style="text-align:right;"><b>${fmtRp(r.total_harga)}</b><div class="bo-item-sub bo-st">${escapeHtml(stText)}</div>${r.status === "pending" && !r.arsip && typeof cuCancelBtn === "function" ? cuCancelBtn("bot", r.id, r.total_harga) : ""}</div></div>${open ? botTagsPanel(r) : ""}`; }).join("");
 }
 function botTagsPanel(r) {
@@ -175,6 +188,7 @@ document.addEventListener("click", async (e) => {
     const id = Number(b.dataset.botags);
     if (botTagOpen.has(id)) { botTagOpen.delete(id); renderBotOrders(); return; }
     botTagOpen.add(id); renderBotOrders();
+    if (!botTagCache[id] && botAllTags && botAllTags.has(id)) { botTagCache[id] = botTagsOf(id); renderBotOrders(); return; }   // sudah ada dari pencarian: tanpa request
     if (!botTagCache[id]) {
         const { data, error } = await cuRpc("cu_bot_tags", { p_id: id });
         if (error || !data) {
@@ -188,6 +202,54 @@ document.addEventListener("click", async (e) => {
 });
 document.addEventListener("click", (e) => { const k = e.target.closest("#botKind button[data-bk]"); if (k) { botKind = k.dataset.bk; renderBotOrders(); } });
 document.addEventListener("click", (e) => { const f = e.target.closest("#botFilter button[data-bf]"); if (f) { botFilter = f.dataset.bf; renderBotOrders(); } });
+document.addEventListener("click", (e) => { const p = e.target.closest("#botPkg button[data-bp]"); if (p) { botPkg = p.dataset.bp; renderBotOrders(); } });
+document.addEventListener("input", (e) => {
+    if (e.target.id !== "botSearch") return;
+    clearTimeout(botSearchTimer);
+    botSearchTimer = setTimeout(async () => { botQ = botNorm(e.target.value); if (botQ) await botEnsureTags(); renderBotOrders(); }, 400);
+});
+
+/* ---------------- Pencarian tagar ---------------- */
+/** ambil semua tagar milik sendiri SEKALI (dipakai ulang sampai daftar pesanan berubah) */
+function botEnsureTags() {
+    if (botAllTags) return Promise.resolve(botAllTags);
+    if (botTagsLoading) return botTagsLoading;
+    botSearchInfo(null, "bo_search_loading");
+    botTagsLoading = cuRpc("cu_my_bot_tags_all").then(({ data, error }) => {
+        botTagsLoading = null;
+        if (error) {
+            const m = error.message || "";
+            showToast(/does not exist|schema cache|Could not find the function/i.test(m) ? t("rn_err_not_ready") : t("bo_search_err"), "danger");
+            return null;
+        }
+        botAllTags = new Map((data || []).map(x => [x.id, { bem: x.bem || [], sem: x.sem || [], lem: x.lem || [] }]));
+        return botAllTags;
+    });
+    return botTagsLoading;
+}
+/** format sama dengan botTagCache: array (Bot Order) atau {bem, sem, lem} (Bulk) */
+function botTagsOf(id) {
+    const x = botAllTags && botAllTags.get(id), r = myBotOrders.find(o => o.id === id);
+    if (!x || !r) return null;
+    return r.dashboard === "BULK" ? x : (x[botPkgKey(r.dashboard)] || []);
+}
+/** tagar yang cocok pada jenis yang dipilih (string), atau null */
+function botHit(r) {
+    if (!botQ) return null;
+    const x = botAllTags && botAllTags.get(r.id);
+    let tags;
+    if (x) tags = botPkg === "all" ? [...x.bem, ...x.sem, ...x.lem] : (x[botPkgKey(botPkg)] || []);
+    else if (botTagCache[r.id]) { const d = botTagCache[r.id]; tags = Array.isArray(d) ? d : botPkg === "all" ? botFlat(d) : (d[botPkgKey(botPkg)] || []); }
+    else tags = [r.tagar_pertama];                       // data lengkap belum ada
+    return tags.find(tg => botNorm(tg).includes(botQ)) || null;
+}
+function botSearchInfo(n, key) {
+    const el = $("botSearchInfo"); if (!el) return;
+    if (key) { el.textContent = t(key); el.style.display = "block"; return; }
+    if (!botQ) { el.style.display = "none"; return; }
+    el.textContent = n ? "🔎 " + t("bo_search_n", { n }) : t("bo_search_none");
+    el.style.display = "block";
+}
 document.addEventListener("click", (e) => { if (e.target.closest("[data-bot-order]")) openBotOrderModal(); });
 document.addEventListener("DOMContentLoaded", () => { loadBotOrders(); pollVisible(() => { if (!window.__syncActive) loadBotOrders(); }, 5 * 60000); });   // diperbarui auto-refresh; cadangan 5 menit (dulu tiap 1 menit)
 document.addEventListener("langchange", renderBotOrders);

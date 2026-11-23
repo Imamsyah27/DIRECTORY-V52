@@ -54,6 +54,27 @@ Detail teknis per fitur juga ada di `UPDATE-13.md` bagian 19–23.
   - Dashboard tidak lagi dimuat dua kali saat dibuka
 - Perkiraan untuk 1 tab admin di Dashboard tanpa aktivitas, dengan 100 pesanan yang belum dicentang: **±128 request/menit → ±3 request/menit**. Tab yang disembunyikan: 0.
 
+### 6. Pesan dengan koin: dialog Ya / Tidak (portal pelanggan)
+- Berlaku untuk Bot Order, Bulk Order, Koin Hayday / Voucher / katalog lain, Pre Order, Supply & Stock, Farm, dan HAV Token.
+- **Koin cukup:** layar "Bayar dengan Koin" diganti dialog singkat **Konfirmasi Pesanan** berisi total dan sisa saldo, dengan tombol **Ya, pesan** / **Tidak**. Pesanan tetap menunggu ACC admin, kecuali Farm/HAV yang memang langsung terkirim.
+- **Koin kurang:** dialog menyebut kekurangannya dan menyediakan tombol **Top Up Koin**. Pesanan tidak dibuat.
+- Tombol di form Bot/Bulk berubah dari "Lanjut ke Pembayaran" menjadi "Pesan".
+- **Langganan harian (Pesan Baru / Perpanjang) tidak diubah:** tetap memakai alur aslinya (`payStep`). `new-order.js` identik dengan versi asli.
+- Kalau sistem koin belum dipasang, alur lama (QRIS / Binance / DANA / PayPal) tetap berjalan.
+
+### 7. Bot Order per jenis BEM / SEM / LEM + search tagar pelanggan
+- **Jenis sudah tersimpan** di `bot_orders.dashboard` (`BEM` / `SEM` / `LEM` / `BULK`, dengan tagar bulk per jenis di `tagar_bem/sem/lem`) dan di `bot_queue.dashboard`. Kolom ini wajib diisi, jadi **tidak ada kolom baru** dan data lama otomatis masuk jenis yang benar.
+- **Admin, Bot Order dan Bulk Order:** sub-tab **BEM / SEM / LEM / Semua**. Pesanan Bulk tampil di setiap jenis yang ada tagarnya.
+  - Di sub-tab jenis, centang "Dikirim" dan **Tandai semua sudah dikirim** hanya menandai **tagar jenis itu** (`bot_set_dikirim_pkg`). Pesanan berstatus Terkirim setelah semua jenisnya terkirim.
+  - **Terima semua** tetap menyetujui pesanan bulk secara utuh.
+- **Search admin** dibatasi pada jenis yang dipilih. "Semua" mencari di seluruh jenis.
+- **Batch Tagar** sudah dihitung terpisah per jenis. Panel baru **📊 Total Tagar per Hari** menampilkan kolom BEM / SEM / LEM untuk semua pelanggan, dimuat 1 request saat tab dibuka (paling sering sekali per 5 menit).
+- **Portal pelanggan:**
+  - Filter jenis **Semua / BEM / SEM / LEM** di tab Bot Order.
+  - Kolom **cari tagar** dengan debounce 400 ms. Semua tagar milik sendiri diambil **1 kali** saat mulai mencari (`cu_my_bot_tags_all`, 100 pesanan terbaru), lalu disaring di browser. Data diambil ulang hanya kalau pesanan berubah.
+  - Panel Total Tagar per Hari punya pilihan jenis yang hanya mengganti tampilan, tanpa request.
+  - Teks baru ada di `i18n.js` (id, en, vi, ar) dan `lang-tr.js`.
+
 ---
 
 ## Urutan menjalankan migrasi (`/migrations`)
@@ -68,6 +89,7 @@ Syaratnya, semua SQL lama di `UPDATE-13.md` (sampai `koin-usdt-24b`) sudah perna
 | 3 | `migrations/003_cu_bot_daily.sql` | Total tagar per hari (`cu_bot_daily`) + index `bot_orders (customer_id, created_at)` | — |
 | 4 | `migrations/004_cu_cancel_order.sql` | Batal order pelanggan (status `cancelled`, `cu_cancel_order`) | 001 |
 | 5 | `migrations/005_hemat_egress.sql` | Auto-refresh per tabel & per pelanggan, `admin_badges`, index | `koin-usdt-21` + 001–004 |
+| 6 | `migrations/006_bot_per_jenis.sql` | Bot Order per jenis: `bot_list` (+ sisa tagar per jenis), `bot_set_dikirim_pkg`, `bot_search_tags` per jenis, `bot_daily_admin`, `cu_bot_daily` per jenis, `cu_my_bot_tags_all`. Tanpa kolom baru | 001–005 |
 
 ⚠️ **Jangan** menjalankan ulang `sql/koin-usdt-23-bot-batch.sql` / `23b` setelah migrasi 001 dan 004. Kalau dijalankan ulang, fungsi batch kembali ke versi lama dan bug Batch 1 muncul lagi.
 Kalau tidak sengaja terjalankan, jalankan ulang 001, lalu 004.
@@ -144,6 +166,33 @@ Lakukan untuk setiap jenis: **Bot Order, Bulk Order, Pesanan Baru, Perpanjang, K
 7. **Arsip:** halaman Data Arsip menampilkan 50 kartu + "Menampilkan 50 dari N" + tombol **Muat 50 lagi**. Mengetik di kolom cari → 1 request setelah berhenti mengetik.
 8. **Klik ganda:** klik ✓ harian dua kali dengan cepat → hari bertambah **1** saja. Klik ganda tombol konfirmasi → aksi berjalan sekali.
 9. **Supabase Dashboard → Reports → API / Database:** bandingkan jumlah request dan egress harian sebelum dan sesudah deploy.
+
+### F. Pesan dengan koin (dialog Ya / Tidak)
+1. Pelanggan dengan saldo cukup → Bot Order → isi tagar → **Pesan** → muncul dialog **Konfirmasi Pesanan** berisi total dan sisa saldo, tanpa layar pembayaran.
+2. **Tidak** → kembali ke form dan tidak ada yang terjadi. **Ya, pesan** → pesanan berstatus Menunggu konfirmasi dan saldo berkurang.
+3. Ulangi untuk Bulk Order, Koin Hayday / Voucher, Pre Order, Supply & Stock, Farm, dan HAV Token.
+4. Saldo kurang → dialog **Koin tidak cukup** menyebut kekurangannya → **Top Up Koin** membuka form top up. Tidak ada pesanan baru di admin.
+5. **Langganan harian tidak berubah:** Pesan Langganan Baru dan Perpanjang tetap menampilkan layar "Bayar dengan Koin" seperti aslinya.
+
+### G. Bot Order per jenis
+1. Buat 1 Bot Order SEM dan 1 Bulk Order (BEM 3 tagar + SEM 2 tagar), lalu admin **Terima semua**.
+2. Admin → Bot Order → **SEM**: hanya pesanan SEM. Bulk Order → **SEM**: pesanan bulk tampil dengan chip "SEM 2 tagar". Bulk Order → **LEM**: pesanan itu tidak tampil.
+3. Bulk Order → **BEM** → filter Perlu Dikirim → **Tandai semua sudah dikirim**:
+   - Di tab BEM pesanan pindah ke Terkirim, di tab SEM masih Perlu dikirim.
+   - Cek: `select dashboard, status, count(*) from bot_queue where order_id = <id> group by 1, 2;` → BEM `sent`, SEM `pending`.
+4. Tandai juga SEM → pesanan berstatus Terkirim penuh (`dikirim_at` terisi).
+5. Batch Tagar: tab BEM / SEM / LEM masing-masing berisi tagar jenisnya saja. Panel **Total Tagar per Hari** menunjukkan BEM 3 dan SEM 2 + 2 untuk hari ini. Ganti 7 / 14 / 30 hari → 1 request per klik.
+6. Search admin di sub-tab SEM: tagar BEM dari pesanan bulk tidak ikut ditemukan. Di "Semua" ditemukan.
+7. Pelanggan → Bot Order → filter **SEM** → pesanan SEM + bulk (chip "SEM: 2 tagar"). Panel Total per Hari → **SEM** → angka berubah tanpa request baru.
+
+### H. Search tagar pelanggan
+1. Pelanggan → Bot Order → DevTools Network (filter `rpc`) → ketik sebagian tagar dari pesanan yang daftarnya belum dibuka → setelah ±400 ms ada **1** request `cu_my_bot_tags_all` dan hasilnya tampil dengan 🔎.
+2. Ketik kata lain → **tidak ada** request baru.
+3. Pilih jenis BEM / SEM / LEM → hasil menyesuaikan tanpa request.
+4. Buka daftar tagar (▸ n tagar) pesanan yang sudah dimuat lewat pencarian → tidak ada request `cu_bot_tags`.
+5. Buat pesanan baru, lalu cari lagi → daftar tagar diambil ulang 1 kali.
+6. Login sebagai pelanggan lain → tagar pelanggan pertama tidak pernah muncul.
+7. Ganti bahasa ID / EN / VI / AR / TR → placeholder dan teks hasil ikut berganti.
 
 ---
 

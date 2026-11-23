@@ -212,7 +212,7 @@ function orderCatalog(id) {
     $("coYes").addEventListener("click", async () => {
         const ct = readContactTagar("co"); if (!ct) return;          // kontak + tagar WAJIB (dicek sebelum pembayaran koin)
         $("coYes").disabled = true;
-        const paid = await payStep({ pkg: "CATALOG", total, note: t("cat_pay_note"),
+        const paid = await coinConfirm({ pkg: "CATALOG", total, note: t("cat_pay_note"),
             lines: [[t("farm_cf_item"), c.nama], [t("farm_cf_qty"), `${fmtNum(q)} × 🪙 ${fmtNum(c.harga_koin)}`]],
             waText: tot => t("cat_wa_text", { u: contactUser(), item: c.nama + " x" + q, kat: tot }) });
         if (!paid) { $("coYes").disabled = false; return; }
@@ -252,7 +252,7 @@ async function buyFarm(id) {
     if (!q || q < 1) { showToast(t("supply_qty_err"), "danger"); return; }
     if (q > f.available) { showToast(t("farm_err_stock"), "danger"); return; }
     const total = f.harga_koin * q;
-    const paid = await payStep({ pkg: "FARM", total, payBtnKey: "farm_pay_btn", note: t("farm_pay_note"),
+    const paid = await coinConfirm({ pkg: "FARM", total, payBtnKey: "farm_pay_btn", note: t("farm_pay_note"),
         lines: [[t("farm_cf_item"), f.nama], [t("farm_cf_qty"), `${fmtNum(q)} × 🪙 ${fmtNum(f.harga_koin)}`]], waText: tot => t("cat_wa_text", { u: contactUser(), item: f.nama + " x" + q, kat: tot }) });
     if (!paid) return;
     const { data, error } = await cuRpc("cu_buy_farm", { p_batch_id: id, p_qty: q });
@@ -267,7 +267,7 @@ async function buyHav(id) {
     if (!q || q < 1) { showToast(t("supply_qty_err"), "danger"); return; }
     if (q > h.available) { showToast(t("hav_err_stock"), "danger"); return; }
     const total = h.harga_koin * q;
-    const paid = await payStep({ pkg: "HAV", total, payBtnKey: "hav_pay_btn", note: t("hav_pay_note"),
+    const paid = await coinConfirm({ pkg: "HAV", total, payBtnKey: "hav_pay_btn", note: t("hav_pay_note"),
         lines: [[t("hav_cf_item"), h.nama], [t("farm_cf_qty"), `${fmtNum(q)} × 🪙 ${fmtNum(h.harga_koin)}`]], waText: tot => t("cat_wa_text", { u: contactUser(), item: h.nama + " x" + q, kat: tot }) });
     if (!paid) return;
     const { data, error } = await cuRpc("cu_buy_hav", { p_batch_id: id, p_qty: q });
@@ -438,7 +438,7 @@ async function preSubmit() {
     if (!r.batches.length) { $("poErr").innerHTML = `<div>⚠️ ${escapeHtml(t("po_err_empty"))}</div>`; return; }
     $("poYes").disabled = true;
     const note = $("poNote").value.trim() || null;
-    const paid = await payStep({ pkg: "PREORDER", total: r.koin, payBtnKey: "po_pay_btn", note: t("po_pay_note"),
+    const paid = await coinConfirm({ pkg: "PREORDER", total: r.koin, payBtnKey: "po_pay_btn", note: t("po_pay_note"),
         lines: [[t("farm_cf_item"), it.nama], [t("po_cf_batch"), `${r.batches.length} × ${fmtNum(r.barang)}`], [t("farm_cf_qty"), `${fmtNum(r.barang)} × 🪙 ${fmtNum(it.harga_koin)} ${t("po_price_unit")}`]],
         waText: tot => t("cat_wa_text", { u: contactUser(), item: it.nama + " Pre Order", kat: tot }) });
     if (!paid) { if ($("poYes")) $("poYes").disabled = false; return; }

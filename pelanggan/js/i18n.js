@@ -434,3 +434,69 @@ Object.assign(TRANSLATIONS.id, { view_table: "Tabel", view_box: "Box" });
 Object.assign(TRANSLATIONS.en, { view_table: "Table", view_box: "Cards" });
 Object.assign(TRANSLATIONS.vi, { view_table: "Bảng", view_box: "Thẻ" });
 Object.assign(TRANSLATIONS.ar, { view_table: "جدول", view_box: "بطاقات" });
+
+/* Bot Order: konfirmasi koin (Ya / Tidak), pencarian tagar, jenis BEM / SEM / LEM */
+Object.assign(TRANSLATIONS.id, {
+    cc_title: "Konfirmasi Pesanan",
+    cc_sub: "Yakin ingin memesan? 🪙 {n} koin akan dipotong dari saldo Anda.",
+    cc_yes: "Ya, pesan",
+    cc_no: "Tidak",
+    cc_short_title: "Koin tidak cukup",
+    cc_short_sub: "Saldo Anda kurang 🪙 {n} koin. Top up dulu, lalu pesan lagi.",
+    bo_search_ph: "Cari tagar di pesanan Anda…",
+    bo_search_n: "{n} pesanan berisi tagar ini",
+    bo_search_none: "Tagar tidak ditemukan di pesanan Anda.",
+    bo_search_loading: "Memuat tagar…",
+    bo_search_err: "Gagal memuat tagar, coba lagi.",
+    bo_pkg_label: "Jenis",
+    bk_send: "Pesan",
+    bo_pkg_tags: "{pkg}: {n} tagar"
+});
+Object.assign(TRANSLATIONS.en, {
+    cc_title: "Confirm Order",
+    cc_sub: "Place this order? 🪙 {n} coins will be deducted from your balance.",
+    cc_yes: "Yes, order",
+    cc_no: "No",
+    cc_short_title: "Not enough coins",
+    cc_short_sub: "You are 🪙 {n} coins short. Please top up, then order again.",
+    bo_search_ph: "Search tags in your orders…",
+    bo_search_n: "{n} orders contain this tag",
+    bo_search_none: "Tag not found in your orders.",
+    bo_search_loading: "Loading tags…",
+    bo_search_err: "Could not load tags, please try again.",
+    bo_pkg_label: "Type",
+    bk_send: "Order",
+    bo_pkg_tags: "{pkg}: {n} tags"
+});
+Object.assign(TRANSLATIONS.vi, {
+    cc_title: "Xác nhận đơn",
+    cc_sub: "Bạn chắc chắn đặt đơn? 🪙 {n} xu sẽ bị trừ khỏi số dư.",
+    cc_yes: "Có, đặt đơn",
+    cc_no: "Không",
+    cc_short_title: "Không đủ xu",
+    cc_short_sub: "Bạn còn thiếu 🪙 {n} xu. Hãy nạp xu rồi đặt lại.",
+    bo_search_ph: "Tìm thẻ trong đơn của bạn…",
+    bo_search_n: "{n} đơn có thẻ này",
+    bo_search_none: "Không tìm thấy thẻ trong đơn của bạn.",
+    bo_search_loading: "Đang tải thẻ…",
+    bo_search_err: "Không tải được thẻ, hãy thử lại.",
+    bo_pkg_label: "Loại",
+    bk_send: "Đặt đơn",
+    bo_pkg_tags: "{pkg}: {n} thẻ"
+});
+Object.assign(TRANSLATIONS.ar, {
+    cc_title: "تأكيد الطلب",
+    cc_sub: "هل تريد تأكيد الطلب؟ سيتم خصم 🪙 {n} عملة من رصيدك.",
+    cc_yes: "نعم، اطلب",
+    cc_no: "لا",
+    cc_short_title: "العملات غير كافية",
+    cc_short_sub: "ينقصك 🪙 {n} عملة. اشحن الرصيد ثم اطلب مرة أخرى.",
+    bo_search_ph: "ابحث عن وسم في طلباتك…",
+    bo_search_n: "{n} طلبات تحتوي هذا الوسم",
+    bo_search_none: "لم يتم العثور على الوسم في طلباتك.",
+    bo_search_loading: "جارٍ تحميل الوسوم…",
+    bo_search_err: "تعذر تحميل الوسوم، حاول مرة أخرى.",
+    bo_pkg_label: "النوع",
+    bk_send: "اطلب",
+    bo_pkg_tags: "{pkg}: {n} وسم"
+});
