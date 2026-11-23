@@ -124,3 +124,8 @@ Order → **🔑 HAV**: daftar pembelian key (waktu, pembeli, batch, jumlah, har
 - Sekarang tiap tagar punya status **pending → sent → archived** (atau **cancelled**). Batch hanya berisi tagar pending.
 - **✅ Tandai sudah dikirim** (per batch): tagar langsung keluar dari batch, slot diisi tagar pending berikutnya. Tagar pindah ke panel **Sudah dikirim** (↩ untuk mengembalikan), lalu **📦 Arsipkan** (per paket / semua). Pesanan yang semua tagarnya terkirim ikut diarsip.
 - Menu **Order → Bot Order**: sub-tab **BEM Order / SEM Order / LEM Order / Semua**, tombol **✅ Terima semua** (filter Menunggu) dan **✅ Tandai semua sudah dikirim** (filter Perlu Dikirim) untuk pesanan yang sedang tampil — satu kali proses, tidak perlu klik satu per satu. Kedua tombol juga ada di Bulk Order.
+
+## 20. Pencarian tagar Bot Order — jalankan `migrations/002_bot_search_tags.sql`
+- Menu **Order → Bot Order / Bulk Order**: kolom **🔍 Cari** (tagar, nama pelanggan, atau nomor pesanan). Hasil mencakup semua status & paket di tab itu; tagar yang cocok ditandai 🔎.
+- Mencari dulu di data yang sudah dimuat di browser. Server (`bot_search_tags`, maks. 50 hasil) hanya dipakai bila ada pesanan yang daftar tagarnya belum dibuka, minimal 2 huruf, dengan jeda ketik 400 ms. Hasil yang sama tidak diminta ulang.
+
