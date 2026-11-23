@@ -1,0 +1,152 @@
+# CHANGELOG
+
+Perubahan di atas versi asli **V8-update-13-8**. Website tetap vanilla JavaScript (tanpa framework).
+Detail teknis per fitur juga ada di `UPDATE-13.md` bagian 19–23.
+
+---
+
+## Ringkasan perubahan
+
+### 1. Perbaikan Batch Tagar Bot + aksi massal Bot Order (admin)
+- **Bug lama:** tagar yang sudah ditandai "sudah dikirim" tetap muncul terus di Batch 1. Penyebabnya, nomor batch dihitung dari **semua** tagar pesanan yang belum diarsip, termasuk yang sudah terkirim. Tagar baru keluar dari antrian kalau seluruh pesanannya diarsip.
+- Tiap tagar sekarang punya status: `pending → sent → archived`, atau `cancelled`.
+- Batch hanya berisi tagar `pending`. Tombol **✅ Tandai sudah dikirim** menyimpan status ke database. Kalau gagal, muncul pesan. Kalau berhasil, tagar langsung hilang dari batch tanpa reload dan slotnya diisi tagar pending berikutnya.
+- Panel **Sudah dikirim (belum diarsip)** punya tombol ↩ untuk mengembalikan tagar ke batch dan 📦 **Arsipkan** (per paket atau semua). Pesanan yang semua tagarnya sudah terkirim ikut diarsip.
+- Menu **Order → Bot Order** dipisah menjadi sub-tab **BEM Order / SEM Order / LEM Order / Semua**.
+- Tombol massal **✅ Terima semua** dan **✅ Tandai semua sudah dikirim** berlaku untuk pesanan yang sedang tampil dan cukup 1 request. Kedua tombol juga ada di Bulk Order.
+- Portal pelanggan memakai nomor batch yang sama dengan admin.
+
+### 2. Pencarian tagar di Bot Order (admin)
+- Kolom 🔍 Cari menerima tagar, nama pelanggan, atau #nomor pesanan, dengan debounce 400 ms. Hasilnya mencakup semua status & paket; tagar yang cocok ditandai 🔎.
+- Kalau tagar sudah dimuat di browser, pencarian tidak membuat request sama sekali. Kalau belum, server memakai `ilike` + limit 50 + kolom seperlunya (`bot_search_tags`). Hasil disimpan per kata kunci.
+
+### 3. Total tagar per hari (portal pelanggan)
+- Panel **📊 Total Tagar per Hari** ada di tab Bot Order. Defaultnya 7 hari, dengan pilihan 7 / 14 / 30 hari. Isinya tanggal, jumlah tagar, dan jumlah pesanan; tanggal memakai zona Asia/Jakarta.
+- Dihitung di database dengan `group by` tanggal (`cu_bot_daily`). Pelanggan hanya melihat datanya sendiri, berdasarkan sesi login.
+- Pesanan yang ditolak atau dibatalkan tidak dihitung. Data tidak ikut polling.
+
+### 4. Batal order oleh pelanggan
+- Berlaku untuk order yang **masih menunggu**: Bot/Bulk, Pesanan Baru/Perpanjang, Koin Hayday/Voucher/Katalog, Pre Order, Supply & Stock, dan Top Up Koin.
+- Selalu ada dialog konfirmasi. Status menjadi `cancelled` dan data **tidak dihapus**. Sebelumnya, batal Perpanjang, Supply, dan Top Up menghapus baris.
+- Koin dan jatah kode referal dikembalikan otomatis.
+- Pengecekan ada di database (`cu_cancel_order`): hanya pemilik order dan hanya order berstatus pending.
+- Admin melihat filter dan label **🚫 Dibatalkan** di semua daftar order. Order batal tidak bisa di-ACC atau dikirim, dan tagarnya tidak pernah masuk batch.
+- Celah lama ditutup: tombol "Sudah dikirim / Batal kirim" di Supply & Stock tidak bisa lagi mengubah order yang sudah ditolak atau dibatalkan.
+- Farm dan HAV Token tidak bisa dibatalkan, karena barangnya langsung terkirim saat dibayar.
+
+### 5. Hemat egress database
+- **Penyebab utama dulu:** `resetDailyUTC` jalan tiap menit. Setiap kali, ia melakukan `select *` seluruh `orders` dan mengirim 1 UPDATE per pesanan. Setiap UPDATE membuat semua web admin dan pelanggan memuat ulang data.
+- **Sekarang:** fungsi itu cukup menghitung (`count`, tanpa data) tiap 5 menit, lalu mengirim 1 UPDATE massal hanya bila perlu.
+- **Badge menu admin:** 1 request kecil (`admin_badges`), hanya saat ada perubahan. Dulu 6 daftar penuh tiap menit.
+- **Auto-refresh:** admin dicek tiap 20 detik dan pelanggan tiap 30 detik (dulu 12 detik). Keduanya berhenti saat tab disembunyikan. Versi dicatat per tabel dan per pelanggan, dan bagian yang dimuat ulang hanya yang tabelnya berubah.
+- Polling lama hanya menjadi cadangan tiap 5–10 menit, dan hanya kalau auto-refresh mati.
+- Tidak ada lagi `select("*")`, dan semua daftar diberi batas.
+  - Data Arsip dan Riwayat Tagar dimuat per 50.
+  - Pencarian arsip dikerjakan di server dengan debounce 400 ms.
+- Hitungan memakai `count: "exact", head: true`. Grafik hanya mengambil data 12 bulan.
+- Cache sessionStorage dengan masa berlaku:
+  - jumlah arsip: 60 detik
+  - grafik arsip: 10 menit
+  - harga & kontak admin di portal pelanggan: 10 menit
+- Cegah request ganda:
+  - fungsi load digabung kalau dipanggil bersamaan
+  - tombol konfirmasi dan tombol ✓ harian tidak bisa terpicu dua kali (✓ harian juga dicek di server)
+  - Dashboard tidak lagi dimuat dua kali saat dibuka
+- Perkiraan untuk 1 tab admin di Dashboard tanpa aktivitas, dengan 100 pesanan yang belum dicentang: **±128 request/menit → ±3 request/menit**. Tab yang disembunyikan: 0.
+
+---
+
+## Urutan menjalankan migrasi (`/migrations`)
+
+Jalankan di **Supabase → SQL Editor**, satu file sekali Run, **berurutan**. Semua file aman diulang.
+Syaratnya, semua SQL lama di `UPDATE-13.md` (sampai `koin-usdt-24b`) sudah pernah dijalankan.
+
+| # | File | Isi | Wajib setelah |
+|---|------|-----|---------------|
+| 1 | `migrations/001_bot_queue_status.sql` | Status tagar batch, fungsi batch baru, Terima semua / Tandai semua dikirim | `koin-usdt-23` + `23b` |
+| 2 | `migrations/002_bot_search_tags.sql` | Pencarian tagar Bot Order (`bot_search_tags`) | 001 |
+| 3 | `migrations/003_cu_bot_daily.sql` | Total tagar per hari (`cu_bot_daily`) + index `bot_orders (customer_id, created_at)` | — |
+| 4 | `migrations/004_cu_cancel_order.sql` | Batal order pelanggan (status `cancelled`, `cu_cancel_order`) | 001 |
+| 5 | `migrations/005_hemat_egress.sql` | Auto-refresh per tabel & per pelanggan, `admin_badges`, index | `koin-usdt-21` + 001–004 |
+
+⚠️ **Jangan** menjalankan ulang `sql/koin-usdt-23-bot-batch.sql` / `23b` setelah migrasi 001 dan 004. Kalau dijalankan ulang, fungsi batch kembali ke versi lama dan bug Batch 1 muncul lagi.
+Kalau tidak sengaja terjalankan, jalankan ulang 001, lalu 004.
+
+Folder `/migrations` diblokir dari publik oleh `vercel.json`.
+
+---
+
+## Cara menguji
+
+Gunakan akun pelanggan percobaan dengan saldo koin secukupnya. Buka admin dan portal pelanggan di dua jendela browser.
+Untuk memeriksa database, gunakan query **read-only** di SQL Editor seperti yang ditulis di bawah.
+
+### A. Batch Tagar
+1. Pelanggan: buat Bot Order **BEM** dengan 3 tagar, lalu Bot Order BEM lagi dengan 2 tagar.
+2. Admin → Order → Bot Order → sub-tab **BEM Order**. Kedua pesanan tampil. Tab SEM/LEM tidak menampilkannya.
+3. Klik **✅ Terima semua** → konfirmasi menunjukkan 2 pesanan / 5 tagar → Ya. Muncul toast "2 pesanan disetujui".
+4. Admin → Order → **📋 Batch Tagar**, lalu ubah **Isi per batch** menjadi `2` → Simpan. Kalau antrian BEM tadinya kosong: Batch 1 = 2 tagar, Batch 2 = 2 tagar, Batch 3 = 1 tagar. Kembalikan isi per batch ke nilai semula setelah selesai menguji.
+5. Klik **✅ Tandai sudah dikirim** di Batch 1:
+   - Batch 1 langsung berisi 2 tagar berikutnya, tanpa reload. Batch 2 sekarang berisi 1 tagar.
+   - Tagar tadi muncul di panel **Sudah dikirim**.
+   - Cek di database: `select tagar, status from bot_queue order by id desc limit 5;` → 2 baris `sent`, sisanya `pending`.
+6. Klik ↩ pada satu tagar di panel Sudah dikirim. Tagar itu kembali ke posisi awalnya di batch.
+7. Tandai semua batch terkirim, lalu klik **📦 Arsipkan BEM terkirim**:
+   - Panel Sudah dikirim kosong.
+   - Kedua pesanan pindah ke filter **🗂️ Arsip** di Bot Order.
+   - Cek: `select status, count(*) from bot_queue group by status;` → tagar tadi `archived`.
+8. **Pesan bila gagal:** buka tab Batch Tagar di dua tab admin. Di tab A tandai Batch 1. Di tab B tandai Batch 1 yang sama (data lama) → muncul toast merah "Tagar ini sudah berubah status…".
+9. **Tandai semua sudah dikirim:** buat dan ACC 2 pesanan baru → filter **📮 Perlu Dikirim** → **✅ Tandai semua sudah dikirim**. Pesanan berstatus Terkirim dan tagarnya hilang dari Batch Tagar.
+10. Pelanggan → tab Bot Order: chip batch menunjukkan nomor batch yang sama dengan admin. Tagar terkirim tampil sebagai `BEM: n tagar ✅`.
+
+### B. Pencarian tagar (Bot Order admin)
+1. Admin → Order → Bot Order. Buka DevTools → Network, filter `rpc`.
+2. Ketik sebagian tagar dari pesanan yang daftar tagarnya **belum** dibuka:
+   - Hasil muncul ±400 ms setelah berhenti mengetik.
+   - Hanya ada **1** request `bot_search_tags`, bukan satu per huruf.
+   - Tagar yang cocok ditandai 🔎.
+3. Hapus lalu ketik ulang kata yang sama → **tidak ada** request baru (hasil dari cache).
+4. Buka daftar tagar (▸ n tagar) semua pesanan di tab itu, lalu cari tagar baru → **tidak ada** request (filter di browser).
+5. Cari nama pelanggan atau `#12` (nomor pesanan) → pesanan yang sesuai tampil.
+6. Ketik `%` atau `_` → tidak dianggap wildcard; hasilnya hanya tagar yang benar-benar mengandung karakter itu.
+7. Selama mencari, tombol massal tersembunyi. Klik filter status atau sub-tab paket → pencarian dikosongkan.
+
+### C. Total tagar per hari (portal pelanggan)
+1. Pelanggan → tab **🤖 Bot Order** → panel **📊 Total Tagar per Hari** tampil dengan 7 baris (hari ini paling atas). Hari tanpa pesanan tampil samar.
+2. Buat Bot Order 4 tagar → angka hari ini bertambah 4 dan "1 pesanan" bertambah, tanpa reload halaman.
+3. Klik **14 hari** / **30 hari** → jumlah baris berubah. Cek di Network: response hanya berisi 1 baris per hari, bukan daftar pesanan.
+4. Admin menolak pesanan itu → setelah ±30 detik angka hari ini berkurang lagi.
+5. **Hanya milik sendiri:** login sebagai pelanggan lain → angkanya berbeda. Cek: `select cu_bot_daily('<token-acak>'::uuid, 7);` → error "Sesi login tidak valid".
+6. Ganti bahasa (EN/VI/AR/TR) → teks panel ikut berganti.
+
+### D. Batal order (pelanggan)
+Lakukan untuk setiap jenis: **Bot Order, Bulk Order, Pesanan Baru, Perpanjang, Koin Hayday / Voucher, Pre Order, Supply & Stock, Top Up Koin**.
+1. Catat saldo koin. Buat order (status Menunggu) → saldo berkurang.
+2. Klik **✖ Batalkan** → dialog konfirmasi muncul dan menyebut jumlah koin yang kembali.
+   - Klik **Tidak** → tidak terjadi apa-apa.
+   - Klik **Ya, batalkan** → status **🚫 Dibatalkan** dan saldo kembali seperti semula.
+3. Cek data **tidak terhapus**: `select id, status, cancelled_at from bot_orders order by id desc limit 3;` (ganti tabel: `renewal_requests`, `catalog_orders`, `preorder_orders`, `supply_orders`, `coin_topups`).
+4. Pesanan Baru/Perpanjang dengan kode referal → setelah dibatalkan, kode yang sama bisa dipakai lagi.
+5. Admin → daftar terkait → filter **🚫 Dibatalkan** menampilkan order tersebut. Yang tersedia hanya tombol Hapus atau Arsipkan; tidak ada Setujui atau Kirim.
+6. **Tidak bisa membatalkan order yang sudah diproses:** admin meng-ACC order dulu → tombol Batalkan hilang di pelanggan. Kalau tombol dari tampilan lama tetap diklik, muncul pesan "sudah diproses".
+7. **Hanya milik sendiri:** coba batalkan order milik pelanggan lain lewat konsol browser: `cuRpc("cu_cancel_order", { p_kind: "bot", p_id: <id milik orang lain> })` → error "Pesanan tidak ditemukan atau sudah diproses".
+8. **Tidak masuk batch:** Bot Order yang dibatalkan tidak muncul di Batch Tagar. Cek: `select count(*) from bot_queue q join bot_orders o on o.id = q.order_id where o.status = 'cancelled' and q.status = 'pending';` → `0`.
+9. **Mode lihat admin** (👁 Tampilan Customer): tombol Batalkan tidak tampil.
+10. Supply & Stock → Order Masuk: order berstatus Ditolak / Dibatalkan tidak punya tombol ✅ / ↩.
+
+### E. Egress / jumlah request
+1. **Request per menit (admin):** buka Dashboard, masukkan PIN, buka DevTools → Network dengan filter `supabase.co`, kosongkan daftar, lalu diamkan 1 menit tanpa menyentuh apa pun → kira-kira **3 request** (`sync_get`), ditambah sesekali `orders?select=id` (HEAD). Dulu puluhan sampai ratusan.
+2. **Tab disembunyikan:** pindah ke tab browser lain selama 1 menit, lalu kembali → tidak ada request selama tersembunyi.
+3. **Tidak ada `select=*`:** di Network, cari `select=*` → tidak ada hasil. Request `orders` hanya membawa daftar kolom.
+4. **Reset harian tanpa banjir UPDATE:** diamkan 5 menit → paling banyak 1 request HEAD `orders` dan 1 PATCH massal (hanya bila ada keterangan yang perlu dikosongkan). Tidak ada PATCH per pesanan.
+5. **Badge menu:** buat order baru dari pelanggan → dalam ±20 detik badge Order bertambah lewat **1** request `admin_badges`.
+6. **Per pelanggan:** buka portal pelanggan A dan B. Pelanggan B membuat order → di jendela A hanya ada `cu_sync_get` tiap 30 detik, tanpa memuat ulang daftar pesanan.
+7. **Arsip:** halaman Data Arsip menampilkan 50 kartu + "Menampilkan 50 dari N" + tombol **Muat 50 lagi**. Mengetik di kolom cari → 1 request setelah berhenti mengetik.
+8. **Klik ganda:** klik ✓ harian dua kali dengan cepat → hari bertambah **1** saja. Klik ganda tombol konfirmasi → aksi berjalan sekali.
+9. **Supabase Dashboard → Reports → API / Database:** bandingkan jumlah request dan egress harian sebelum dan sesudah deploy.
+
+---
+
+## Catatan
+- Web versi baru tetap berjalan bila migrasi belum dijalankan. Fitur yang butuh SQL menampilkan pesan "Jalankan dulu migrations/…", dan auto-refresh memakai cara lama.
+- Status ini belum diuji di browser sungguhan. Lakukan pengujian di atas sebelum dipakai pelanggan.
