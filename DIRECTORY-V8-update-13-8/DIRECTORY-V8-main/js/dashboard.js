@@ -13,11 +13,12 @@ async function loadData() {
     tbody.innerHTML = "";
     if (typeof loadRenewals === "function") loadRenewals();
 
-    const { data, error } = await supabaseClient
+    const { data, error } = await ordersQuery(cols => supabaseClient
         .from("orders")
-        .select("*")
+        .select(cols)
         .eq("dashboard", currentDashboard)
-        .order("id", { ascending: true });
+        .order("id", { ascending: true })
+        .limit(5000));
 
     loadingState.style.display = "none";
 
@@ -219,7 +220,7 @@ document.getElementById("holdDoBtn").addEventListener("click", () => holdOrders(
 /* Arsipkan langganan yang dicentang (aktif maupun tunda), walau BELUM selesai. Otomatis muncul juga di Arsip pelanggan. */
 document.getElementById("holdArchiveBtn").addEventListener("click", async () => {
     const ids = [...holdSel]; if (!ids.length) return;
-    const { data, error } = await supabaseClient.from("orders").select("*").in("id", ids);
+    const { data, error } = await ordersQuery(cols => supabaseClient.from("orders").select(cols).in("id", ids));
     if (error || !data || !data.length) { showToast("Gagal memuat data pesanan", "danger"); return; }
     const belum = data.filter(o => o.paket_terkirim < o.paket_total).length, held = data.filter(o => o.hold).length;
     openConfirmModal({
@@ -240,12 +241,18 @@ document.getElementById("holdArchiveBtn").addEventListener("click", async () => 
  * total dan per dashboard (BEM / SEM / LEM).
  */
 async function loadUncheckedStats() {
-    const { data, error } = await supabaseClient.from("orders").select("*");
+    const today = getUTCDate();
+    // hanya yang belum dicentang hari ini, 3 kolom (dulu select * seluruh orders tiap menit)
+    let res = await supabaseClient.from("orders").select("dashboard,paket_terkirim,paket_total,hold")
+        .or(`last_check_utc.is.null,last_check_utc.neq.${today}`).limit(10000);
+    if (res.error && /hold/i.test(res.error.message || ""))
+        res = await supabaseClient.from("orders").select("dashboard,paket_terkirim,paket_total").or(`last_check_utc.is.null,last_check_utc.neq.${today}`).limit(10000);
+    const { data, error } = res;
     if (error || !data) return;
-    const today = getUTCDate(), c = { BEM: 0, SEM: 0, LEM: 0, "FAST-BEM": 0, "FAST-SEM": 0, "FAST-LEM": 0 };
+    const c = { BEM: 0, SEM: 0, LEM: 0, "FAST-BEM": 0, "FAST-SEM": 0, "FAST-LEM": 0 };
     data.forEach(o => {
         const k = (o.dashboard || "").toUpperCase();
-        if (k in c && !o.hold && o.paket_terkirim < o.paket_total && o.last_check_utc !== today) c[k]++;
+        if (k in c && !o.hold && o.paket_terkirim < o.paket_total) c[k]++;
     });
     const total = Object.values(c).reduce((a, b) => a + b, 0);
     const set = (id, v) => { const el = document.getElementById(id); if (el) el.innerText = v; };
@@ -254,7 +261,9 @@ async function loadUncheckedStats() {
     const bar = document.getElementById("uncheckedBar");
     if (bar) bar.classList.toggle("all-done", total === 0);
 }
-setInterval(loadUncheckedStats, 60000);
+loadUncheckedStats = dedupeAsync(loadUncheckedStats);
+// diperbarui otomatis saat data orders berubah (js/autorefresh.js); polling cadangan 5 menit hanya bila auto-refresh tidak aktif
+pollVisible(() => { if (!window.__syncActive) loadUncheckedStats(); }, 5 * 60000);
 document.querySelectorAll(".uc-chip[data-uc]").forEach(ch => ch.addEventListener("click", () => {
     const tab = document.querySelector(`#dashboardTabs .tab[data-dashboard="${ch.dataset.uc}"]`);
     if (tab) tab.click();
@@ -274,6 +283,7 @@ async function moveOrdersToArchive(list) {
     }));
     const { error: insErr } = await supabaseClient.from("archives").insert(rows);
     if (insErr) { console.error(insErr); showToast("Gagal menyimpan ke arsip — tidak ada data yang dipindahkan", "danger"); return false; }
+    ssCache.del("arc");          // jumlah & statistik arsip berubah
     const { error: delErr } = await supabaseClient.from("orders").delete().in("id", list.map(o => o.id));
     if (delErr) { console.error(delErr); showToast("Tersimpan ke arsip, tapi gagal dihapus dari daftar aktif", "danger"); return false; }
     return true;
@@ -284,7 +294,7 @@ const isFastDash = d => String(d || "").toUpperCase().startsWith("FAST-");
  * Arsipkan SEMUA langganan yang sudah mencapai limit pada dashboard yang sedang dibuka.
  */
 async function archiveAllLimit() {
-    const { data, error } = await supabaseClient.from("orders").select("*").eq("dashboard", currentDashboard);
+    const { data, error } = await ordersQuery(cols => supabaseClient.from("orders").select(cols).eq("dashboard", currentDashboard).limit(5000));
     if (error || !data) { showToast("Gagal memuat data pesanan", "danger"); return; }
     const limited = data.filter(o => !o.hold && o.paket_terkirim >= o.paket_total);
     if (limited.length === 0) { showToast("Tidak ada langganan yang sudah mencapai limit", "danger"); return; }
@@ -314,11 +324,11 @@ function handleArchiveOrder(id) {
         confirmText: "Simpan ke Arsip",
         confirmClass: "btn-archive",
         onConfirm: async () => {
-            const { data, error } = await supabaseClient
+            const { data, error } = await ordersQuery(cols => supabaseClient
                 .from("orders")
-                .select("*")
+                .select(cols)
                 .eq("id", id)
-                .single();
+                .single());
 
             if (error || !data) {
                 showToast("Gagal mengambil data pesanan", "danger");
@@ -351,11 +361,11 @@ async function deleteOrder(id) {
 }
 
 async function editOrder(id) {
-    const { data, error } = await supabaseClient
+    const { data, error } = await ordersQuery(cols => supabaseClient
         .from("orders")
-        .select("*")
+        .select(cols)
         .eq("id", id)
-        .single();
+        .single());
 
     if (error || !data) {
         showToast("Gagal memuat data pesanan", "danger");
@@ -389,3 +399,7 @@ async function editOrder(id) {
         showToast(pindah ? `Pesanan dipindah ke paket ${dashboard.replace("FAST-", "⚡ Fast ")}` : "Perubahan pesanan disimpan", "success");
     });
 }
+
+/* satu pemuatan dalam satu waktu: klik tab cepat / auto-refresh bersamaan tidak membuat request ganda */
+loadData = dedupeAsync(loadData);
+

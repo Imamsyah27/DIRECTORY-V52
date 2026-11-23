@@ -283,4 +283,8 @@ async function boRefreshBadge() {
     const { data, error } = await supabaseClient.rpc("bot_list", { p_pin: boPin() });
     if (!error && data) { boAll = data; boBadge(); }
 }
-document.addEventListener("DOMContentLoaded", () => { setTimeout(boRefreshBadge, 1500); setInterval(boRefreshBadge, 60000); });
+// lencana menu kini diperbarui oleh js/autorefresh.js (admin_badges, 1 request & hanya saat ada perubahan);
+// dulu fungsi ini dipanggil tiap 60 detik dan mengunduh daftar penuh. Fungsi tetap dipakai sebagai cadangan.
+
+/* cegah request ganda (klik cepat / auto-refresh bersamaan) */
+boLoad = dedupeAsync(boLoad);

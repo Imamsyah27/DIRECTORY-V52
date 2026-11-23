@@ -207,3 +207,61 @@ function linkify(raw) {
         return `<a href="${href}" target="_blank" rel="noopener noreferrer" class="auto-link">${url}</a>${tail}`;
     });
 }
+
+/* =====================================================================
+ * HEMAT EGRESS — helper bersama (dipakai semua modul admin)
+ * ===================================================================== */
+
+/** Kolom tabel orders yang dipakai web (pengganti select("*")). */
+const ORDER_COLS_BASE = "id,dashboard,nomor_pesanan,tagar,nomor_whatsapp,paket_total,paket_terkirim,last_check_utc,keterangan,created_at";
+let ORDER_COLS = ORDER_COLS_BASE + ",hold,hold_at";
+/** Jalankan query orders dengan ORDER_COLS; bila kolom hold belum ada (SQL 18 belum dijalankan) ulangi tanpa kolom itu. */
+async function ordersQuery(build) {
+    let res = await build(ORDER_COLS);
+    if (res.error && /hold/i.test(res.error.message || "") && ORDER_COLS !== ORDER_COLS_BASE) {
+        ORDER_COLS = ORDER_COLS_BASE; res = await build(ORDER_COLS);
+    }
+    return res;
+}
+
+/** Cache sessionStorage dengan masa berlaku (ms). Aman bila storage diblokir. */
+const ssCache = {
+    get(key) {
+        try { const raw = sessionStorage.getItem("c:" + key); if (!raw) return null; const o = JSON.parse(raw); if (Date.now() > o.exp) { sessionStorage.removeItem("c:" + key); return null; } return o.v; }
+        catch (_) { return null; }
+    },
+    set(key, value, ttlMs) { try { sessionStorage.setItem("c:" + key, JSON.stringify({ exp: Date.now() + ttlMs, v: value })); } catch (_) {} },
+    del(prefix) { try { Object.keys(sessionStorage).filter(k => k.startsWith("c:" + prefix)).forEach(k => sessionStorage.removeItem(k)); } catch (_) {} }
+};
+
+/**
+ * Cegah request ganda: selama fn masih berjalan, panggilan baru tidak membuat request baru.
+ * Bila ada panggilan saat berjalan, fn dijalankan SEKALI lagi setelah selesai (data tetap terbaru).
+ */
+function dedupeAsync(fn) {
+    let running = null, again = false, lastArgs = [], startedAt = 0;
+    const wrapped = function (...args) {
+        lastArgs = args;
+        if (running) {
+            // panggilan yang datang hampir bersamaan (< 500 ms) digabung; yang datang belakangan memicu 1x muat ulang
+            if (Date.now() - startedAt > 500) again = true;
+            return running;
+        }
+        running = (async () => {
+            try { do { again = false; startedAt = Date.now(); await fn.apply(this, lastArgs); } while (again); }
+            finally { running = null; }
+        })();
+        return running;
+    };
+    wrapped._raw = fn;
+    return wrapped;
+}
+
+/** setInterval yang hanya jalan saat tab terlihat (document.visibilityState === "visible"). */
+function pollVisible(fn, ms) {
+    return setInterval(() => { if (document.visibilityState === "visible") fn(); }, ms);
+}
+
+/** Status auto-refresh (diisi js/autorefresh.js): true = perubahan data terdeteksi otomatis, polling cadangan tidak perlu. */
+window.__syncActive = false;
+

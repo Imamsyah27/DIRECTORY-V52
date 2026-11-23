@@ -30,7 +30,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.addEventListener("themechange", () => renderCharts());
     document.addEventListener("langchange", () => { renderArchiveNotice(); renderAnnouncements(); renderSupply(); renderSupplyOrders(); renderArchive(); renderCharts(); });
     loadAnnouncements(); loadSupply();
-    setInterval(pollArchiveNotice, 60000);
+    pollVisible(() => { if (!window.__syncActive) pollArchiveNotice(); }, 5 * 60000);   // arsip baru terdeteksi auto-refresh; cadangan 5 menit (dulu tiap 1 menit)
 });
 
 /* ---------------- Notifikasi arsip baru (badge di tab Arsip + banner) ---------------- */

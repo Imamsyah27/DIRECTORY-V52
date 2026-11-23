@@ -1,11 +1,17 @@
+const _checkBusy = new Set();     // cegah klik ganda pada tombol ✓ (dulu bisa menambah hari 2x)
 async function checkDaily(id) {
+    if (_checkBusy.has(id)) return;
+    _checkBusy.add(id);
+    try { await _checkDaily(id); } finally { _checkBusy.delete(id); }
+}
+async function _checkDaily(id) {
     const todayUTC = getUTCDate();
 
-    const { data, error } = await supabaseClient
+    const { data, error } = await ordersQuery(cols => supabaseClient
         .from("orders")
-        .select("*")
+        .select(cols)
         .eq("id", id)
-        .single();
+        .single());
 
     if (error || !data) {
         showToast("Gagal memuat data pesanan", "danger");
@@ -30,14 +36,19 @@ async function checkDaily(id) {
     const wa = data.nomor_whatsapp ? `https://wa.me/${data.nomor_whatsapp.replace("+", "")}` : "";
     const keterangan = `${data.dashboard} ${paketBaru} | ${data.tagar}${wa ? " | " + wa : ""}`;
 
-    await supabaseClient
+    // pengaman di server: hanya baris yang BELUM dicentang hari ini yang diubah (tab lain / klik ganda tidak menambah hari lagi)
+    const { data: upd, error: updErr } = await supabaseClient
         .from("orders")
         .update({
             paket_terkirim: terkirim,
             last_check_utc: todayUTC,
             keterangan: keterangan
         })
-        .eq("id", id);
+        .eq("id", id)
+        .or(`last_check_utc.is.null,last_check_utc.neq.${todayUTC}`)
+        .select("id");
+    if (updErr) { console.error(updErr); showToast("Gagal mencatat pengiriman", "danger"); return; }
+    if (!upd || !upd.length) { showToast("Pengiriman hari ini sudah dicentang", "danger"); loadData(); return; }
 
     // Fast Order (1 hari): setelah dikirim & dicentang langsung masuk arsip
     if (isFastDash(data.dashboard) && terkirim >= data.paket_total) {
@@ -59,10 +70,11 @@ async function checkDaily(id) {
 async function checkAllDaily() {
     const todayUTC = getUTCDate();
 
-    const { data, error } = await supabaseClient
+    const { data, error } = await ordersQuery(cols => supabaseClient
         .from("orders")
-        .select("*")
-        .eq("dashboard", currentDashboard);
+        .select(cols)
+        .eq("dashboard", currentDashboard)
+        .limit(5000));
 
     if (error || !data) {
         showToast("Gagal memuat data pesanan", "danger");
@@ -133,21 +145,22 @@ async function checkAllDaily() {
     });
 }
 
+/**
+ * Kosongkan keterangan pesanan yang belum dicentang hari ini (UTC) — perilaku sama seperti dulu.
+ * DULU: tiap 1 menit select * seluruh orders + 1 UPDATE per pesanan, walau keterangannya sudah kosong
+ * (tiap UPDATE juga membuat semua web admin & pelanggan memuat ulang data) -> penyebab utama egress berlebih.
+ * SEKARANG: cek jumlah dulu (count head: tanpa data, tidak memicu auto-refresh), lalu 1 UPDATE massal
+ * HANYA bila memang ada yang perlu dikosongkan. Dipanggil saat buka, tiap 5 menit (tab terlihat), dan saat data orders berubah.
+ */
 async function resetDailyUTC() {
     const todayUTC = getUTCDate();
-
-    const { data } = await supabaseClient.from("orders").select("*");
-    if (!data) return;
-
-    for (const item of data) {
-        if (item.last_check_utc !== todayUTC) {
-            await supabaseClient
-                .from("orders")
-                .update({ keterangan: "" })
-                .eq("id", item.id);
-        }
-    }
+    const need = `last_check_utc.is.null,last_check_utc.neq.${todayUTC}`;
+    const { count, error } = await supabaseClient.from("orders").select("id", { count: "exact", head: true })
+        .or(need).neq("keterangan", "");
+    if (error) { console.error(error); return; }
+    if (!count) return;
+    const { error: updErr } = await supabaseClient.from("orders").update({ keterangan: "" }).or(need).neq("keterangan", "");
+    if (updErr) console.error(updErr);
 }
-
-// cek pergantian hari UTC setiap 1 menit
-setInterval(resetDailyUTC, 60000);
+resetDailyUTC = dedupeAsync(resetDailyUTC);
+pollVisible(resetDailyUTC, 5 * 60000);

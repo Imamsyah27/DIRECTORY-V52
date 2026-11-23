@@ -178,4 +178,5 @@ async function poRefreshBadge() {
     const { data, error } = await supabaseClient.rpc("po_list_orders", { p_pin: poPin() });
     if (!error && data) { poOrders = data; poOrdBadge(); }
 }
-document.addEventListener("DOMContentLoaded", () => { setTimeout(poRefreshBadge, 2200); setInterval(poRefreshBadge, 60000); });
+// lencana menu kini diperbarui oleh js/autorefresh.js (admin_badges, 1 request & hanya saat ada perubahan);
+// dulu fungsi ini dipanggil tiap 60 detik dan mengunduh daftar penuh. Fungsi tetap dipakai sebagai cadangan.

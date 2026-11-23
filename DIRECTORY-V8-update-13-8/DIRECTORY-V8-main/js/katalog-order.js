@@ -126,7 +126,8 @@ async function kcRefreshBadges() {
     { const r = await supabaseClient.rpc("sp_list_orders", { p_pin: kcPin(), p_status: "pending" }); const n = r.data ? r.data.length : 0, b = document.getElementById("coBadge-supply"); if (b) { b.textContent = n; b.style.display = n ? "inline-block" : "none"; } }
     for (const kind of ["koin", "voucher"]) { const { data, error } = await supabaseClient.rpc("co_list", { p_pin: kcPin(), p_kind: kind }); if (!error && data) { KC[kind].all = data; kcBadge(kind); } }
 }
-document.addEventListener("DOMContentLoaded", () => { setTimeout(kcRefreshBadges, 2200); setInterval(kcRefreshBadges, 60000); });
+// lencana menu kini diperbarui oleh js/autorefresh.js (admin_badges, 1 request & hanya saat ada perubahan);
+// dulu fungsi ini dipanggil tiap 60 detik dan mengunduh daftar penuh. Fungsi tetap dipakai sebagai cadangan.
 
 
 /* ---------------- Supply & Stock (pesanan masuk: Menunggu / Terkirim / Ditolak) ---------------- */

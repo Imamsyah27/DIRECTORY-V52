@@ -9,18 +9,23 @@ function _stKey(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padSt
 async function loadStatistik() {
     if (typeof Chart === "undefined") { showToast("Library chart gagal dimuat (cek koneksi)", "danger"); return; }
 
-    const [a, b] = await Promise.all([
-        supabaseClient.from("orders").select("dashboard,created_at"),
-        supabaseClient.from("archives").select("dashboard,created_at")
+    // Total sepanjang waktu = hitungan di server (count head, tanpa data); grafik bulanan hanya butuh 12 bulan terakhir.
+    // (dulu: seluruh baris orders + archives diunduh setiap kali halaman dibuka)
+    const since = new Date(new Date().getFullYear(), new Date().getMonth() - 11, 1).toISOString();
+    const head = (tb, d) => supabaseClient.from(tb).select("id", { count: "exact", head: true }).eq("dashboard", d);
+    const [a, b, ...counts] = await Promise.all([
+        supabaseClient.from("orders").select("dashboard,created_at").gte("created_at", since).limit(20000),
+        supabaseClient.from("archives").select("dashboard,created_at").gte("created_at", since).limit(20000),
+        ...["BEM", "SEM", "LEM"].flatMap(d => [head("orders", d), head("archives", d)])
     ]);
     if (a.error) { console.error(a.error); showToast("Gagal memuat statistik", "danger"); return; }
     const rows = [...(a.data || []), ...(b.data || [])];
 
     const tot = { BEM: 0, SEM: 0, LEM: 0 };
+    ["BEM", "SEM", "LEM"].forEach((d, i) => { tot[d] = (counts[i * 2].count || 0) + (counts[i * 2 + 1].count || 0); });
     const perBulan = {};
     rows.forEach(r => {
         const k = (r.dashboard || "").toUpperCase();
-        if (k in tot) tot[k]++;
         if (!r.created_at || !(k in tot)) return;
         const m = _stKey(new Date(r.created_at));
         (perBulan[m] = perBulan[m] || { BEM: 0, SEM: 0, LEM: 0 })[k]++;
@@ -71,8 +76,16 @@ async function renderDashStats(activeData, st) {
     document.getElementById("dsLabel").innerText = dash;
     document.getElementById("dsLabel2").innerText = dash;
 
-    const arc = await supabaseClient.from("archives").select("created_at").eq("dashboard", dash);
-    const rows = [...activeData, ...((arc.data) || [])];
+    // arsip 12 bulan terakhir saja, disimpan 10 menit di sessionStorage (dulu seluruh arsip diunduh tiap kali Dashboard dimuat)
+    const since = new Date(new Date().getFullYear(), new Date().getMonth() - 11, 1).toISOString();
+    let arcRows = ssCache.get("arc:dash:" + dash);
+    if (!arcRows) {
+        const arc = await supabaseClient.from("archives").select("created_at").eq("dashboard", dash).gte("created_at", since).limit(20000);
+        if (arc.error) { console.error(arc.error); arcRows = []; }
+        else { arcRows = arc.data || []; ssCache.set("arc:dash:" + dash, arcRows, 10 * 60000); }
+    }
+    if (dash !== currentDashboard) return;          // tab sudah diganti saat menunggu
+    const rows = [...activeData, ...arcRows];
     const per = {};
     rows.forEach(r => { if (r.created_at) { const k = _stKey(new Date(r.created_at)); per[k] = (per[k] || 0) + 1; } });
 
@@ -93,3 +106,6 @@ async function renderDashStats(activeData, st) {
     draw("dsStatus", { type: "doughnut", data: { labels: ["Proses", "Mendekati Limit", "Selesai"], datasets: [{ data: [st.proses, st.mendekati, st.selesai], backgroundColor: [_tc.info, _tc.warning, _tc.success], borderColor: _tc.surface, borderWidth: 3 }] },
         options: { ...base, cutout: "66%", plugins: { legend: { position: "right", labels: { usePointStyle: true, boxWidth: 8 } } } } });
 }
+
+/* cegah request ganda (klik cepat / auto-refresh bersamaan) */
+loadStatistik = dedupeAsync(loadStatistik);

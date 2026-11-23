@@ -276,7 +276,7 @@ async function getTagarBatchById(id) {
 
     const { data, error } = await supabaseClient
         .from("tagar_batches")
-        .select("*")
+        .select("id,total_tagar,unique_tagar,duplicate_count,group_count,groups,duplicates,created_at")
         .eq("id", id)
         .single();
 
@@ -289,15 +289,20 @@ async function getTagarBatchById(id) {
 
 /* ---------------- Riwayat Batch ---------------- */
 
+let tagarHistLimit = 50;           // jumlah riwayat yang ditampilkan; "Muat 50 lagi" menambah 50
+function loadMoreTagarHistory() { tagarHistLimit += 50; loadTagarHistory(); }
 async function loadTagarHistory() {
     const container = document.getElementById("tagarHistoryList");
     const emptyState = document.getElementById("tagarHistoryEmpty");
     if (!container) return;
 
+    // daftar riwayat: hanya ringkasan (dulu select * = seluruh teks & tabel hasil semua batch).
+    // Isi lengkap diambil per batch saat dibuka (getTagarBatchById). Dimuat per 50.
     const { data, error } = await supabaseClient
         .from("tagar_batches")
-        .select("*")
-        .order("id", { ascending: false });
+        .select("id,total_tagar,unique_tagar,duplicate_count,group_count,created_at")
+        .order("id", { ascending: false })
+        .limit(tagarHistLimit + 1);
 
     if (error) {
         console.error(error);
@@ -314,9 +319,12 @@ async function loadTagarHistory() {
     }
     emptyState.style.display = "none";
 
-    // tampilkan hasil paling baru sebagai "hasil aktif" jika belum ada yang tampil
+    const hasMore = list.length > tagarHistLimit;
+    if (hasMore) list.length = tagarHistLimit;
+
+    // tampilkan hasil paling baru sebagai "hasil aktif" jika belum ada yang tampil (isi lengkap diambil terpisah)
     if (!window._activeTagarBatch && list.length > 0) {
-        renderTagarActiveResult(list[0]);
+        getTagarBatchById(list[0].id).then(full => { if (full && !window._activeTagarBatch) renderTagarActiveResult(full); });
     }
 
     container.innerHTML = list.map(batch => `
@@ -333,7 +341,7 @@ async function loadTagarHistory() {
             </div>
             <div class="tagar-history-body" id="tagarHistoryBody-${batch.id}"></div>
         </div>
-    `).join("");
+    `).join("") + (hasMore ? `<div class="archive-more"><button type="button" class="btn btn-ghost" onclick="loadMoreTagarHistory()">⬇ Muat 50 lagi</button></div>` : "");
 }
 
 async function showTagarBatchInActive(id) {

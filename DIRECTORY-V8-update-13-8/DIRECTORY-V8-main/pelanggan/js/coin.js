@@ -107,5 +107,5 @@ async function openTopupModal(need) {
     upd();
 }
 
-document.addEventListener("DOMContentLoaded", () => { loadCoin(); setInterval(() => { if (!document.hidden) loadCoin(); }, 60000); });
+document.addEventListener("DOMContentLoaded", () => { loadCoin(); pollVisible(() => { if (!window.__syncActive) loadCoin(); }, 5 * 60000); });   // saldo diperbarui auto-refresh; cadangan 5 menit (dulu tiap 1 menit)
 document.addEventListener("langchange", renderCoinBox);

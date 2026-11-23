@@ -117,9 +117,11 @@ document.getElementById("statusFilterSelect").addEventListener("change", filterT
 document.getElementById("copyAllTagsBtn").addEventListener("click", copyAllTags);
 document.getElementById("checkAllBtn").addEventListener("click", checkAllDaily);
 
-document.getElementById("archiveSearchInput").addEventListener("input", renderArchivePage);
-document.getElementById("archiveFilterDashboard").addEventListener("change", renderArchivePage);
-document.getElementById("archiveSort").addEventListener("change", renderArchivePage);
+// pencarian arsip dikerjakan di server -> tunggu 400 ms setelah berhenti mengetik (dulu 1 request penuh per huruf)
+let _arcSearchTimer = null;
+document.getElementById("archiveSearchInput").addEventListener("input", () => { clearTimeout(_arcSearchTimer); _arcSearchTimer = setTimeout(() => renderArchivePage(), 400); });
+document.getElementById("archiveFilterDashboard").addEventListener("change", () => renderArchivePage());
+document.getElementById("archiveSort").addEventListener("change", () => renderArchivePage());
 
 /* ---------------- Tambah Pesanan ---------------- */
 addBtn.addEventListener("click", async () => {
@@ -175,4 +177,4 @@ addBtn.addEventListener("click", async () => {
     bpAfterAddOrder(bpCtx, { dashboard: dashboardDipesan, nama: nomorPesanan, hari: paket, tagar });
 });
 
-loadData();
+// loadData() pertama dipanggil dari js/init.js (dulu dipanggil di sini JUGA -> 2x request saat halaman dibuka)

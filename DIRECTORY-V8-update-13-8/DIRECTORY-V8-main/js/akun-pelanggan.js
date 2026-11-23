@@ -129,7 +129,8 @@ async function loadUnlinkedCustomers() {
     const { data, error } = await supabaseClient
         .from("orders")
         .select("nomor_pesanan, dashboard, nomor_whatsapp")
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(10000);
 
     if (error) {
         console.error(error);

@@ -154,3 +154,6 @@ document.addEventListener("DOMContentLoaded", () => {
     document.querySelectorAll("#rnFilter button").forEach(b => b.addEventListener("click", () => { rnFilter = b.dataset.f; renderRenewals(); }));
     // ganti tab BEM/LEM/SEM -> loadData() -> loadRenewals() (lihat dashboard.js)
 });
+
+/* cegah request ganda (klik cepat / auto-refresh bersamaan) */
+loadRenewals = dedupeAsync(loadRenewals);

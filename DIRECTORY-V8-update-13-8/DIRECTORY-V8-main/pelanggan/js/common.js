@@ -98,3 +98,41 @@ function linkify(raw) {
         return `<a href="${href}" target="_blank" rel="noopener noreferrer" class="auto-link">${url}</a>${tail}`;
     });
 }
+
+/* =====================================================================
+ * HEMAT EGRESS — helper bersama portal pelanggan
+ * ===================================================================== */
+/** Cache sessionStorage dengan masa berlaku (ms), terpisah per sesi login. Aman bila storage diblokir. */
+const ssCache = {
+    _k: key => "c:" + String(getSession() || "").slice(0, 8) + ":" + key,
+    get(key) {
+        try { const raw = sessionStorage.getItem(this._k(key)); if (!raw) return null; const o = JSON.parse(raw); if (Date.now() > o.exp) { sessionStorage.removeItem(this._k(key)); return null; } return o.v; }
+        catch (_) { return null; }
+    },
+    set(key, value, ttlMs) { try { sessionStorage.setItem(this._k(key), JSON.stringify({ exp: Date.now() + ttlMs, v: value })); } catch (_) {} },
+    del(key) { try { sessionStorage.removeItem(this._k(key)); } catch (_) {} }
+};
+/** Selama fn berjalan, panggilan baru tidak membuat request baru; bila ada, fn dijalankan SEKALI lagi setelah selesai. */
+function dedupeAsync(fn) {
+    let running = null, again = false, lastArgs = [], startedAt = 0;
+    const wrapped = function (...args) {
+        lastArgs = args;
+        if (running) {
+            // panggilan yang datang hampir bersamaan (< 500 ms) digabung; yang datang belakangan memicu 1x muat ulang
+            if (Date.now() - startedAt > 500) again = true;
+            return running;
+        }
+        running = (async () => {
+            try { do { again = false; startedAt = Date.now(); await fn.apply(this, lastArgs); } while (again); }
+            finally { running = null; }
+        })();
+        return running;
+    };
+    wrapped._raw = fn;
+    return wrapped;
+}
+/** setInterval yang hanya jalan saat tab terlihat. */
+function pollVisible(fn, ms) { return setInterval(() => { if (document.visibilityState === "visible") fn(); }, ms); }
+/** true = auto-refresh aktif (js/autorefresh.js), polling cadangan tidak perlu. */
+window.__syncActive = false;
+

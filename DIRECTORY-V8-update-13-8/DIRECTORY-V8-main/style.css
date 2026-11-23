@@ -1473,3 +1473,7 @@ tr.pe-bulk .ie-input{ width:100%; }
 /* Bot Order: pencarian tagar */
 .bo-search-info{ font-size:12.5px; color:var(--text-muted); margin:-4px 0 10px; }
 .bo-hit{ display:inline-block; margin-top:3px; padding:1px 8px; border-radius:99px; font-size:11.5px; background:rgba(217,119,6,.14); }
+/* Data Arsip: muat bertahap */
+.archive-more{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:center; margin:14px 0 4px; font-size:12.5px; color:var(--text-muted); }
+.archive-more .btn{ width:auto; }
+

@@ -64,7 +64,9 @@ const fmtRp = (n) => "Rp " + Number(n || 0).toLocaleString(numLocale());
 
 function ensurePriceInfo() {
     if (cuPriceInfo) return Promise.resolve(cuPriceInfo);
-    if (!_priceLoading) _priceLoading = cuRpc("cu_price_info").then(({ data, error }) => { if (!error && data) cuPriceInfo = data; _priceLoading = null; return cuPriceInfo; });
+    // harga jarang berubah: simpan 10 menit di sessionStorage (dihapus otomatis saat admin mengubah harga, lihat autorefresh.js)
+    const hit = ssCache.get("price"); if (hit) { cuPriceInfo = hit; return Promise.resolve(cuPriceInfo); }
+    if (!_priceLoading) _priceLoading = cuRpc("cu_price_info").then(({ data, error }) => { if (!error && data) { cuPriceInfo = data; ssCache.set("price", data, 10 * 60000); } _priceLoading = null; return cuPriceInfo; });
     return _priceLoading;
 }
 

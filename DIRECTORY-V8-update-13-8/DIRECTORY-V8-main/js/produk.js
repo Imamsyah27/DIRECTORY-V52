@@ -1,3 +1,5 @@
+/** kolom produk yang dipakai halaman List-Farm (pengganti select("*")) */
+const PRODUK_COLS = "id,kategori,dashboard,nama_produk,jumlah_akun,terpakai,daftar_error,list_tagar,isi_ulang,keterangan";
 /**
  * ====================================================================
  * PRODUK — Supabase (tabel `products`)
@@ -58,10 +60,11 @@ async function loadProduk() {
 
     const { data, error } = await supabaseClient
         .from("products")
-        .select("*")
+        .select(PRODUK_COLS)
         .eq("kategori", currentKategoriProduk)
         .eq("dashboard", currentDashboardProduk)
-        .order("id", { ascending: true });
+        .order("id", { ascending: true })
+        .limit(2000);
 
     loadingState.style.display = "none";
 
@@ -139,7 +142,8 @@ function renderProdukRow(item, i) {
 }
 
 async function updateProdukStats() {
-    const { data, error } = await supabaseClient.from("products").select("*");
+    // ringkasan hanya butuh 3 kolom (dulu select * seluruh produk termasuk daftar tagar yang panjang)
+    const { data, error } = await supabaseClient.from("products").select("jumlah_akun,terpakai,isi_ulang").limit(10000);
     if (error || !data) return;
 
     const total = data.length;
@@ -372,7 +376,7 @@ async function openProdukDecision(id) {
     if (peGuard()) return;
     const { data, error } = await supabaseClient
         .from("products")
-        .select("*")
+        .select(PRODUK_COLS)
         .eq("id", id)
         .single();
 
@@ -516,7 +520,7 @@ async function openTagarListModal(id, focusIndex = null) {
     if (peGuard()) return;
     const { data, error } = await supabaseClient
         .from("products")
-        .select("*")
+        .select(PRODUK_COLS)
         .eq("id", id)
         .single();
 
@@ -869,7 +873,8 @@ async function handleCariTagarPosisi() {
 
     const { data, error } = await supabaseClient
         .from("products")
-        .select("id, nama_produk, kategori, dashboard, list_tagar");
+        .select("id, nama_produk, kategori, dashboard, list_tagar")
+        .limit(5000);
 
     if (error) {
         console.error(error);

@@ -176,5 +176,5 @@ function renderRateBar() {
     const r = cuRate();
     el.innerHTML = r ? `<div class="rate-bar">💵 <b>${escapeHtml(t("rate_bar"))}</b> · 1 USDT ≈ <b>${escapeHtml(fmtRp(Math.round(r)))}</b></div>` : "";
 }
-document.addEventListener("DOMContentLoaded", () => { ensurePriceInfo().then(renderRateBar); setInterval(() => { if (!document.hidden) { cuPriceInfo = null; ensurePriceInfo().then(() => { renderRateBar(); renderPriceList(); }); } }, 120000); });
+document.addEventListener("DOMContentLoaded", () => { ensurePriceInfo().then(renderRateBar); pollVisible(() => { if (window.__syncActive) return; cuPriceInfo = null; ssCache.del("price"); ensurePriceInfo().then(() => { renderRateBar(); renderPriceList(); }); }, 10 * 60000); });   // cadangan bila auto-refresh mati (dulu tiap 2 menit)
 document.addEventListener("langchange", renderRateBar);

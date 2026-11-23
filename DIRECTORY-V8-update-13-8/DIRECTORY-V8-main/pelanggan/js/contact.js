@@ -20,11 +20,13 @@ const waUrl = (text, num) => `https://wa.me/${num || ADMIN_WA_INTL}` + (text ? `
 let cuPanel = { wa_bukti: "", wa_supply: "" };
 const waProof = text => waUrl(text, cuPanel.wa_bukti);
 const waSupply = text => waUrl(text, cuPanel.wa_supply);
-async function loadPanel() {
-    const { data } = await cuRpc("cu_panel_info");
+async function loadPanel(force) {
+    // nomor admin jarang berubah: cache 10 menit (force = dari auto-refresh saat admin mengubahnya)
+    let data = force ? null : ssCache.get("panel");
+    if (!data) { const r = await cuRpc("cu_panel_info"); data = r.data; if (data) ssCache.set("panel", data, 10 * 60000); }
     if (data) { cuPanel = { wa_bukti: data.wa_bukti || "", wa_supply: data.wa_supply || "" }; if (typeof renderSupplyChat === "function") renderSupplyChat(); }
 }
-document.addEventListener("DOMContentLoaded", () => { loadPanel(); setInterval(() => { if (!document.hidden) loadPanel(); }, 120000); });
+document.addEventListener("DOMContentLoaded", () => { loadPanel(); pollVisible(() => { if (!window.__syncActive) loadPanel(true); }, 10 * 60000); });   // dulu tiap 2 menit
 const msgrUrl = (text) => ADMIN_MESSENGER_URL + (text ? `?text=${encodeURIComponent(text)}` : "");
 
 /** Dua tombol (WhatsApp + Messenger) dengan pesan otomatis. */

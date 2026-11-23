@@ -47,10 +47,11 @@ function openConfirmModal(options) {
     modalOverlay.classList.add("show");
 
     document.getElementById("modalCancelBtn").addEventListener("click", closeModal);
+    // { once: true }: klik ganda pada tombol konfirmasi tidak menjalankan aksi dua kali
     document.getElementById("modalConfirmBtn").addEventListener("click", () => {
         onConfirm();
         closeModal();
-    });
+    }, { once: true });
 }
 
 /**

@@ -141,3 +141,25 @@ Order → **🔑 HAV**: daftar pembelian key (waktu, pembeli, batch, jumlah, har
 - Admin: filter / label **🚫 Dibatalkan** di Bot Order, Bulk Order, Koin Hayday, Voucher, Supply, Pre Order, Top Up Koin, Perpanjangan, dan Supply & Stock → Order Masuk. Order batal tidak bisa di-ACC / dikirim, dan tagarnya tidak pernah masuk Batch Tagar.
 - Farm / HAV Token tidak bisa dibatalkan (langsung terkirim otomatis saat dibayar).
 
+## 23. Hemat egress database — jalankan `migrations/005_hemat_egress.sql` (setelah 001–004)
+Web tetap jalan tanpa SQL ini (memakai cara lama), tapi penghematan terbesar butuh SQL ini.
+- **Penyebab utama dulu:** `resetDailyUTC` tiap 1 menit mengunduh seluruh `orders` dan mengirim 1 UPDATE per pesanan; tiap UPDATE membuat semua web admin & pelanggan memuat ulang data. Sekarang: 1 hitungan `count` (tanpa data) tiap 5 menit, UPDATE massal hanya bila perlu.
+- **Lencana menu admin:** 1 request kecil (`admin_badges`) dan hanya saat ada perubahan; dulu 6 daftar penuh (sampai 500 baris) tiap menit.
+- **Auto-refresh:** admin cek tiap 20 dtk, pelanggan tiap 30 dtk (dulu 12 dtk), berhenti total saat tab disembunyikan. Versi per tabel + per pelanggan: pesanan pelanggan lain tidak membuat halaman pelanggan memuat ulang.
+- **Polling lama** (Bot Order, koin, arsip, harga, kontak pelanggan; statistik belum dicentang admin) kini hanya cadangan 5–10 menit bila auto-refresh mati.
+- **Data Arsip** dimuat per 50 (tombol "Muat 50 lagi"), pencarian di server dengan jeda ketik 400 ms. **Riwayat Tagar** per 50. Statistik: total lewat `count`, grafik hanya 12 bulan.
+- **Cache sessionStorage:** jumlah arsip (60 dtk), grafik arsip dashboard (10 mnt), harga & kontak admin di portal pelanggan (10 mnt, dihapus otomatis saat admin mengubahnya).
+- **Kolom seperlunya** menggantikan semua `select("*")`; semua daftar diberi batas.
+- **Cegah request ganda:** pemuat data tidak berjalan dobel, tombol ✓ harian tidak bisa menambah hari 2x (dicek juga di server), tombol konfirmasi tidak terpicu 2x, Dashboard tidak lagi dimuat 2x saat dibuka.
+
+Perkiraan request per menit, 1 tab admin di Dashboard (PIN sudah dimasukkan, tidak ada aktivitas, U = jumlah pesanan yang belum dicentang hari ini):
+| | Sebelum | Sesudah |
+|---|---|---|
+| Cek versi auto-refresh | 5 | 3 |
+| Reset harian (`resetDailyUTC`) | 1 select seluruh orders + U update | 0,2 (count tanpa data) |
+| Statistik "belum dicentang" | 1 (select seluruh orders) | 0 (hanya saat orders berubah) |
+| Lencana menu (Bot, Koin, Voucher, Supply, Top Up, Pre Order) | 6 daftar penuh | 0 (1 request kecil saat ada perubahan) |
+| Muat ulang akibat UPDATE reset harian | ±15 | 0 |
+| **Total (U = 100)** | **±128 / menit** | **±3 / menit** |
+| Tab admin disembunyikan | ±2 + U / menit (tetap jalan) | 0 |
+

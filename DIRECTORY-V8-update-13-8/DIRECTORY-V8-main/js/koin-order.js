@@ -85,4 +85,5 @@ async function kmRefreshBadge() {
     const { data, error } = await supabaseClient.rpc("topup_list", { p_pin: kmPin() });
     if (!error && data) { kmAll = data; kmBadge(); }
 }
-document.addEventListener("DOMContentLoaded", () => { setTimeout(kmRefreshBadge, 1800); setInterval(kmRefreshBadge, 60000); });
+// lencana menu kini diperbarui oleh js/autorefresh.js (admin_badges, 1 request & hanya saat ada perubahan);
+// dulu fungsi ini dipanggil tiap 60 detik dan mengunduh daftar penuh. Fungsi tetap dipakai sebagai cadangan.

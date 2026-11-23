@@ -189,7 +189,7 @@ document.addEventListener("click", async (e) => {
 document.addEventListener("click", (e) => { const k = e.target.closest("#botKind button[data-bk]"); if (k) { botKind = k.dataset.bk; renderBotOrders(); } });
 document.addEventListener("click", (e) => { const f = e.target.closest("#botFilter button[data-bf]"); if (f) { botFilter = f.dataset.bf; renderBotOrders(); } });
 document.addEventListener("click", (e) => { if (e.target.closest("[data-bot-order]")) openBotOrderModal(); });
-document.addEventListener("DOMContentLoaded", () => { loadBotOrders(); setInterval(() => { if (!document.hidden) loadBotOrders(); }, 60000); });
+document.addEventListener("DOMContentLoaded", () => { loadBotOrders(); pollVisible(() => { if (!window.__syncActive) loadBotOrders(); }, 5 * 60000); });   // diperbarui auto-refresh; cadangan 5 menit (dulu tiap 1 menit)
 document.addEventListener("langchange", renderBotOrders);
 
 

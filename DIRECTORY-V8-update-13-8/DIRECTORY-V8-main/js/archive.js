@@ -50,39 +50,56 @@ async function archiveOrder(order) {
         return false;
     }
 
+    ssCache.del("arc");
     return true;
 }
 
 /**
- * Jumlah total data arsip (untuk badge di nav).
+ * Jumlah total data arsip (untuk badge di nav). Hitungan di server (count head, tanpa data),
+ * disimpan 60 detik di sessionStorage karena dipanggil di setiap pemuatan Dashboard.
  */
 async function getArchiveCount() {
+    const hit = ssCache.get("arc:count"); if (hit !== null) return hit;
     const { count, error } = await supabaseClient
         .from("archives")
-        .select("*", { count: "exact", head: true });
+        .select("id", { count: "exact", head: true });
 
     if (error) {
         console.error(error);
         return 0;
     }
+    ssCache.set("arc:count", count || 0, 60000);
     return count || 0;
 }
 
 /* ---------------- Rendering Halaman Data Arsip ---------------- */
+// Dimuat per 50 kartu ("Muat 50 lagi"); pencarian & filter dikerjakan di server (dulu seluruh arsip diunduh tiap kali).
+const ARC_COLS = "id,dashboard,nomor_pesanan,tagar,nomor_whatsapp,paket_total,paket_terkirim,created_at,archived_at";
+const ARC_PAGE = 50;
+const ARC = { list: [], total: 0, key: "", seq: 0 };
+const arcSafeQ = q => q.replace(/[,()"'\\%*_]/g, " ").trim();      // karakter khusus filter PostgREST dibuang
 
-async function renderArchivePage() {
+async function renderArchivePage(more) {
     const grid = document.getElementById("archiveGrid");
     const emptyState = document.getElementById("archiveEmptyState");
-    const searchValue = document.getElementById("archiveSearchInput").value.toLowerCase().trim();
+    const searchValue = arcSafeQ(document.getElementById("archiveSearchInput").value.toLowerCase());
     const filterDashboard = document.getElementById("archiveFilterDashboard").value;
     const sortMode = document.getElementById("archiveSort").value;
+    const key = [searchValue, filterDashboard, sortMode].join("|");
+    const append = more === true && key === ARC.key;
+    const from = append ? ARC.list.length : 0;
+    const seq = ++ARC.seq;
 
     emptyState.style.display = "none";
 
-    let query = supabaseClient.from("archives").select("*");
+    let query = supabaseClient.from("archives").select(ARC_COLS, { count: "exact" });
 
     if (filterDashboard !== "ALL") {
         query = query.eq("dashboard", filterDashboard);
+    }
+    if (searchValue) {
+        const p = `%${searchValue}%`;
+        query = query.or(`nomor_pesanan.ilike.${p},tagar.ilike.${p},nomor_whatsapp.ilike.${p}`);
     }
 
     if (sortMode === "oldest") {
@@ -93,7 +110,8 @@ async function renderArchivePage() {
         query = query.order("archived_at", { ascending: false });
     }
 
-    const { data, error } = await query;
+    const { data, error, count } = await query.order("id", { ascending: false }).range(from, from + ARC_PAGE - 1);
+    if (seq !== ARC.seq) return;          // sudah ada pencarian / filter yang lebih baru
 
     if (error) {
         console.error(error);
@@ -101,17 +119,19 @@ async function renderArchivePage() {
         return;
     }
 
-    let list = data || [];
+    ARC.key = key;
+    ARC.list = append ? ARC.list.concat(data || []) : (data || []);
+    ARC.total = count || 0;
+    const list = ARC.list;
 
-    if (searchValue) {
-        list = list.filter(a =>
-            a.nomor_pesanan.toLowerCase().includes(searchValue) ||
-            a.tagar.toLowerCase().includes(searchValue) ||
-            (a.nomor_whatsapp || "").toLowerCase().includes(searchValue)
-        );
+    getArchiveCount().then(n => { document.getElementById("archiveCountBadge").innerText = n; });
+
+    const moreBox = document.getElementById("archiveMore");
+    if (moreBox) {
+        moreBox.style.display = list.length && ARC.total > list.length ? "flex" : (list.length ? "flex" : "none");
+        document.getElementById("archiveMoreInfo").textContent = `Menampilkan ${list.length} dari ${ARC.total} data arsip`;
+        document.getElementById("archiveMoreBtn").style.display = ARC.total > list.length ? "" : "none";
     }
-
-    document.getElementById("archiveCountBadge").innerText = await getArchiveCount();
 
     if (list.length === 0) {
         grid.innerHTML = "";
@@ -167,7 +187,7 @@ function handleRestoreArchive(archiveId) {
         onConfirm: async () => {
             const { data, error } = await supabaseClient
                 .from("archives")
-                .select("*")
+                .select("dashboard,nomor_pesanan,tagar,nomor_whatsapp,paket_total,paket_terkirim,keterangan")
                 .eq("id", archiveId)
                 .single();
 
@@ -204,6 +224,7 @@ function handleRestoreArchive(archiveId) {
                 console.error(deleteError);
             }
 
+            ssCache.del("arc");
             renderArchivePage();
             loadData();
             showToast("Pesanan dipulihkan ke daftar aktif", "archive");
@@ -231,8 +252,13 @@ function handleDeleteArchive(archiveId, nama) {
                 return;
             }
 
+            ssCache.del("arc");
             renderArchivePage();
             showToast("Data arsip dihapus permanen", "danger");
         }
     });
 }
+
+/* tombol "Muat 50 lagi" */
+document.getElementById("archiveMoreBtn").addEventListener("click", () => renderArchivePage(true));
+

@@ -227,3 +227,6 @@ function bbDownloadZip() {
     setTimeout(() => URL.revokeObjectURL(url), 2000);
     showToast(`ZIP berisi ${files.length - 1} file batch diunduh`, "success");
 }
+
+/* cegah request ganda (klik cepat / auto-refresh bersamaan) */
+bbInit = dedupeAsync(bbInit);
