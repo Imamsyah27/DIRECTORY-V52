@@ -66,13 +66,14 @@ async function cpForm(customerId) {
     const s = cpData.settings, v = x => x ? x : "";
     const row = (n, k) => `<div class="cp-form-row"><b>${n}</b>
         <input type="number" id="cpD${n}" min="0" inputmode="numeric" placeholder="${s[k]}" value="${v(cur && cur[k])}">
-        <input type="number" id="cpB${n}" min="0" inputmode="numeric" placeholder="${s["bot_" + k] || "-"}" value="${v(cur && cur["bot_" + k])}">
+        <input type="number" id="cpB${n}" min="0" inputmode="numeric" disabled title="Tidak dipakai lagi untuk Bot Order baru — atur di grup &quot;Bot Order · Proses&quot; di bawah" placeholder="${s["bot_" + k] || "-"}" value="${v(cur && cur["bot_" + k])}">
         <input type="number" id="cpU${n}" min="0" step="0.0001" inputmode="decimal" placeholder="USDT" value="${v(cur && cur["usdt_" + k])}"></div>`;
     modalBox.innerHTML = `<div class="modal-icon info">🔐</div><div class="modal-title">${cur ? "Ubah" : "Tambah"} Custom Price</div>
         <div class="modal-form">
             <div class="field"><label>Akun pelanggan</label>${cur ? `<input type="text" value="${escapeHtml(cur.username)}" disabled>` : `<select id="cpCust">${options}</select>`}</div>
-            <div class="cp-form-head"><span></span><span>Harian Rp/hari</span><span>🤖 Bot Rp/tagar</span><span>USDT/hari</span></div>
+            <div class="cp-form-head"><span></span><span>Harian Rp/hari</span><span>🤖 Bot Rp/tagar 🔒</span><span>USDT/hari</span></div>
             ${row("BEM", "bem")}${row("SEM", "sem")}${row("LEM", "lem")}
+            <div class="bot-old-note">🔒 Kolom <b>🤖 Bot</b> (harga per jenis) tidak dipakai lagi untuk Bot Order baru, karena setiap pesanan memakai proses 1F / 2F. Atur harga bot pelanggan ini di grup <b>Bot Order · Proses</b> di bawah. Nilai lama tetap tersimpan.</div>
             <div class="pr-imghint">Angka abu-abu = harga umum. Isi lebih besar untuk menaikkan harga. Kolom kosong = akun ini memakai harga umum untuk paket itu. USDT hanya pembanding — kosongkan agar pembanding USDT paket itu disembunyikan dari akun ini.</div>
             ${piHtml(pi, "custom")}
             <div class="field"><label for="cpNote">Catatan internal (tidak terlihat pelanggan)</label><input type="text" id="cpNote" maxlength="200" value="${escapeHtml(cur ? cur.catatan || "" : "")}"></div>

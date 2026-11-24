@@ -897,14 +897,15 @@
             </section>
 
             <section class="panel pr-panel">
-                <div class="panel-title">📦 Harga Bot Order <span class="panel-hint">harga lama per jenis · Bot Order baru memakai panel "Proses Pengiriman Bot (1F / 2F)"</span></div>
-                <p class="muted-note">Harga jual BEM / SEM / LEM Bot Order per 1 tagar. Dipakai untuk menghitung profit di BSL Profit (tidak mengubah harga harian pelanggan).</p>
+                <div class="panel-title">📦 Harga Bot Order (lama) 🔒 <span class="panel-hint">tidak dipakai lagi · atur di panel "Proses Pengiriman Bot (1F / 2F)"</span></div>
+                <div class="bot-old-note">🔒 <b>Tidak dipakai lagi untuk Bot Order baru.</b> Setiap pesanan Bot Order sekarang memakai harga per kombinasi di panel
+                    <b>Proses Pengiriman Bot (1F / 2F Request)</b>. Angka di bawah hanya acuan lama (pratinjau modal di BSL Profit, saran harga, dan menu Modal) dan sengaja dikunci.</div>
                 <div class="pr-grid">
-                    <div class="field"><label for="prBBem">BEM Bot / tagar (Rp)</label><input type="number" id="prBBem" min="0" inputmode="numeric"></div>
-                    <div class="field"><label for="prBSem">SEM Bot / tagar (Rp)</label><input type="number" id="prBSem" min="0" inputmode="numeric"></div>
-                    <div class="field"><label for="prBLem">LEM Bot / tagar (Rp)</label><input type="number" id="prBLem" min="0" inputmode="numeric"></div>
+                    <div class="field"><label for="prBBem">BEM Bot / tagar (Rp) 🔒</label><input type="number" id="prBBem" min="0" inputmode="numeric" disabled></div>
+                    <div class="field"><label for="prBSem">SEM Bot / tagar (Rp) 🔒</label><input type="number" id="prBSem" min="0" inputmode="numeric" disabled></div>
+                    <div class="field"><label for="prBLem">LEM Bot / tagar (Rp) 🔒</label><input type="number" id="prBLem" min="0" inputmode="numeric" disabled></div>
                 </div>
-                <div style="margin-top:12px;"><button class="btn btn-primary" id="prSaveBot">💾 Simpan Harga Bot</button></div>
+                <div style="margin-top:12px;"><button class="btn btn-primary" id="prSaveBot" disabled title="Harga bot lama dikunci — atur di panel Proses Pengiriman Bot (1F / 2F)">💾 Simpan Harga Bot 🔒</button></div>
             </section>
 
             <section class="panel pr-panel">

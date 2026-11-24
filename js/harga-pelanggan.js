@@ -67,12 +67,13 @@ async function hpForm(customerId) {
     const row = (n, k) => `<div class="hp-form-row"><b>${n}</b>
         <input type="number" id="hpI${n}" min="0" inputmode="numeric" placeholder="${s[k]}" value="${v(cur && cur[k])}">
         <input type="number" id="hpU${n}" min="0" step="0.0001" inputmode="decimal" placeholder="${s["usdt_" + k] || "-"}" value="${v(cur && cur["usdt_" + k])}">
-        <input type="number" id="hpB${n}" min="0" inputmode="numeric" placeholder="${s["bot_" + k] || "-"}" value="${v(cur && cur["bot_" + k])}"></div>`;
+        <input type="number" id="hpB${n}" min="0" inputmode="numeric" disabled title="Tidak dipakai lagi untuk Bot Order baru — atur di grup &quot;Bot Order · Proses&quot; di bawah" placeholder="${s["bot_" + k] || "-"}" value="${v(cur && cur["bot_" + k])}"></div>`;
     modalBox.innerHTML = `<div class="modal-icon info">⭐</div><div class="modal-title">${cur ? "Ubah" : "Tambah"} Harga Pelanggan</div>
         <div class="modal-form">
             <div class="field"><label>Pelanggan</label>${cur ? `<input type="text" value="${escapeHtml(cur.username)}" disabled>` : `<select id="hpCust">${options}</select>`}</div>
-            <div class="hp-form-head"><span></span><span>Harian Rp/hari</span><span>USDT/hari</span><span>🤖 Bot Rp/tagar</span></div>
+            <div class="hp-form-head"><span></span><span>Harian Rp/hari</span><span>USDT/hari</span><span>🤖 Bot Rp/tagar 🔒</span></div>
             ${row("BEM", "bem")}${row("SEM", "sem")}${row("LEM", "lem")}
+            <div class="bot-old-note">🔒 Kolom <b>🤖 Bot</b> (harga per jenis) tidak dipakai lagi untuk Bot Order baru, karena setiap pesanan memakai proses 1F / 2F. Atur harga bot pelanggan ini di grup <b>Bot Order · Proses</b> di bawah. Nilai lama tetap tersimpan.</div>
             <div class="pr-imghint">Angka abu-abu = harga umum. Kosongkan kolom yang ingin memakai harga umum. Pelanggan melihat harga normal dicoret. Harga harian &amp; bot dibayar dengan koin (tanpa diskon umum); USDT hanya pembanding.</div>
             ${piHtml(pi, "special")}
             <div class="field"><label for="hpNote">Catatan (opsional)</label><input type="text" id="hpNote" maxlength="200" value="${escapeHtml(cur ? cur.catatan || "" : "")}"></div>

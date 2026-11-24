@@ -1489,4 +1489,7 @@ tr.bb-total td{ border-top:2px solid var(--border); }
 .chip.bo-pro{ background:rgba(37,99,235,.12); }
 .bpk-table td{ vertical-align:middle; } .bpk-table input[type=number]{ width:120px; }
 .bpk-st{ font-size:12px; font-weight:700; white-space:nowrap; } .bpk-st.on{ color:#16a34a; } .bpk-st.off{ color:#dc2626; } .bpk-st.warn{ color:#d97706; }
+/* harga bot lama: dikunci (diganti harga proses 1F / 2F) */
+.bot-old-note{ margin:6px 0 10px; padding:8px 12px; border-radius:10px; font-size:12.5px; background:rgba(217,119,6,.10); border:1px dashed rgba(217,119,6,.5); }
+input[type=number]:disabled{ opacity:.6; cursor:not-allowed; }
 

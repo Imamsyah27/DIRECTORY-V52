@@ -89,7 +89,8 @@ Detail teknis per fitur juga ada di `UPDATE-13.md` bagian 19–23.
   - Search tagar per proses, dan kolom 1F / 2F di Total Tagar per Hari.
   - Portal pelanggan: filter proses, label proses di setiap pesanan, chip batch "BEM · 1F", Daftar Harga per proses, total per hari 1F / 2F.
 - Pengaturan proses di browser pelanggan **di-cache 10 menit** dan dihapus otomatis saat admin mengubahnya. Tidak ada polling baru, dan tidak ada `select *`.
-- Panel lama "Harga Bot Order" (per jenis) tidak lagi dipakai untuk pesanan baru.
+- **Harga bot lama dikunci:** panel Price "Harga Bot Order (lama)" dan kolom 🤖 Bot di **Custom Price** / **Harga Pelanggan** diberi label 🔒 dan tidak bisa diedit, karena tidak dipakai lagi untuk pesanan baru. Nilai lama tetap tersimpan sebagai acuan (pratinjau modal BSL Profit, saran harga). Tidak ada benturan harga: pesanan baru hanya memakai harga proses.
+- **Modal khusus 1F / 2F:** menu **Modal** → grup "BSL · Bot Order Proses 1F / 2F", 6 isian (1F-BEM … 2F-LEM). Saat pesanan disetujui, BSL Profit memakai modal kombinasi itu. Kalau masih 0 atau kosong, dipakai modal BEM / SEM / LEM Bot lama.
 
 ---
 
@@ -108,7 +109,7 @@ Syaratnya, semua SQL lama di `UPDATE-13.md` (sampai `koin-usdt-24b`) sudah perna
 | 6 | `migrations/006_bot_per_jenis.sql` | Bot Order per jenis: `bot_list` (+ sisa tagar per jenis), `bot_set_dikirim_pkg`, `bot_search_tags` per jenis, `bot_daily_admin`, `cu_bot_daily` per jenis, `cu_my_bot_tags_all`. Tanpa kolom baru | 001–005 |
 | 7 | `migrations/007_bot_proses_1f_2f.sql` | Proses 1F/2F (bagian 1): kolom `proses`, tabel `bot_packages`, harga custom (`price_item` + `pi_catalog`), `bot_pkg_list/save`, `cu_bot_packages`, `cu_request_bot_order` wajib proses | 001–006 |
 | 8 | `migrations/008_bot_proses_batch.sql` | Proses 1F/2F (bagian 2): antrian & batch per proses + jenis, `bot_list` / `cu_my_bot_orders` membawa proses, `bot_search_tags` filter proses | 007 |
-| 9 | `migrations/009_bot_proses_total_bsl.sql` | Proses 1F/2F (bagian 3): total per hari 1F/2F, keterangan BSL Profit, judul notifikasi Telegram | 008 |
+| 9 | `migrations/009_bot_proses_total_bsl.sql` | Proses 1F/2F (bagian 3): total per hari 1F/2F, BSL Profit (keterangan + **modal khusus 1F/2F per jenis**, `md_all_items` / `md_save`), judul notifikasi Telegram | 008 |
 
 ⚠️ **Jangan** menjalankan ulang `sql/koin-usdt-23-bot-batch.sql` / `23b` setelah migrasi 001 dan 004. Kalau dijalankan ulang, fungsi batch kembali ke versi lama dan bug Batch 1 muncul lagi.
 Kalau tidak sengaja terjalankan, jalankan ulang 001, lalu 004.
@@ -227,8 +228,10 @@ Lakukan untuk setiap jenis: **Bot Order, Bulk Order, Pesanan Baru, Perpanjang, K
 4. **Harga dikunci di server:** di console browser jalankan `cuRpc("cu_request_bot_order", { p_dashboard: "LEM", p_proses: "1F", p_tagar_list: ["#x"] })` → ditolak "Harga Bot Order belum diatur admin". Tanpa `p_proses` → ditolak "Pilih proses pengiriman".
 5. **Harga custom:** Admin → Custom Price → pilih pelanggan → grup "Bot Order · Proses" → isi "1F Request · BEM" = 700 → Simpan. Dalam ±10 menit (atau setelah muat ulang), harga BEM di form pelanggan itu menjadi Rp 700, tanpa coretan. Harga Pelanggan tampil dengan coretan.
 6. **Admin Bot Order:** tab **1F** hanya menampilkan pesanan 1F. Setujui → Batch Tagar → **1F Request → BEM** → tagar tampil di "1F · BEM · Batch 1". Order lama tetap ada di "Tanpa proses".
-7. Total per hari: kolom 1F / 2F di admin, dan pilihan 1F / 2F di panel pelanggan.
-8. **Bulk Order dan langganan harian** tetap seperti sebelumnya. Login pelanggan dan cancel order tetap berfungsi.
+7. **Modal 1F / 2F:** menu Modal → isi "1F Request · BEM" = 400 → setujui pesanan 1F-BEM 2 tagar (harga 1000) → BSL Profit mencatat modal 800, profit 1.200. Pesanan 2F-BEM (modal proses kosong) memakai modal "BEM Bot" lama.
+8. **Harga lama terkunci:** Price → "Harga Bot Order (lama) 🔒", serta kolom 🤖 Bot di Custom Price / Harga Pelanggan, tampil abu-abu dan tidak bisa diubah.
+9. Total per hari: kolom 1F / 2F di admin, dan pilihan 1F / 2F di panel pelanggan.
+10. **Bulk Order dan langganan harian** tetap seperti sebelumnya. Login pelanggan dan cancel order tetap berfungsi.
 
 ---
 

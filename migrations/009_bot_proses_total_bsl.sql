@@ -1,6 +1,6 @@
 -- =====================================================================
--- MIGRASI 009 — PROSES 1F / 2F (bagian 3): total tagar per hari (kolom 1F / 2F), keterangan BSL Profit,
--- notifikasi Telegram. Jalankan SEKALI SETELAH migrations/008_bot_proses_batch.sql. Aman diulang.
+-- MIGRASI 009 — PROSES 1F / 2F (bagian 3): total tagar per hari (kolom 1F / 2F), BSL Profit (keterangan + modal
+-- khusus proses 1F / 2F per jenis di menu Modal), notifikasi Telegram. Jalankan SEKALI SETELAH migrations/008_bot_proses_batch.sql. Aman diulang.
 -- =====================================================================
 
 -- 10. Total tagar per hari: tambah kolom 1F / 2F -------------------------------
@@ -63,7 +63,7 @@ begin
                  group by x.tgl) s on s.tgl = d.tgl), '[]'::jsonb);
 end; $$;
 
--- 11. BSL Profit: keterangan Bot Order mencantumkan proses (sama dengan koin-usdt-23 selain keterangan) ----
+-- 11. BSL Profit: keterangan Bot Order mencantumkan proses + modal khusus proses (sama dengan koin-usdt-23 selain itu) ----
 create or replace function bot_approve(p_pin text, p_id bigint)
 returns jsonb language plpgsql security definer set search_path = public, extensions as $$
 declare b bot_orders%rowtype; v_m integer; v_modal bigint; v_ket text;
@@ -84,7 +84,9 @@ begin
                 greatest((v_modal + b.jumlah - 1) / b.jumlah, 0), b.total_harga, v_modal, b.id)
         on conflict (bot_order_id) where bot_order_id is not null do nothing;
     else
-        v_m := md_get('bsl:bot_' || lower(case when b.dashboard in ('BEM', 'SEM') then b.dashboard else 'LEM' end));
+        -- modal: modal khusus proses + jenis (mis. bsl:bot_1f_bem) bila diisi > 0, selain itu modal BEM / SEM / LEM Bot lama
+        v_m := case when b.proses is not null then nullif(md_get('bsl:bot_' || lower(b.proses) || '_' || lower(b.dashboard)), 0) end;
+        v_m := coalesce(v_m, md_get('bsl:bot_' || lower(case when b.dashboard in ('BEM', 'SEM') then b.dashboard else 'LEM' end)));
         v_modal := v_m::bigint * b.jumlah;
         insert into bsl_entries (tanggal, jenis, kategori, pelanggan, keterangan, hari, jumlah_tagar, harga_hari, modal_hari, omset, modal, bot_order_id)
         values ((now() at time zone 'Asia/Jakarta')::date, 'bot', b.dashboard || ' Bot', b.username,
@@ -114,5 +116,69 @@ begin
     exception when others then null; end;
     return null;
 end; $$;
+
+-- 13. MODAL khusus proses 1F / 2F per jenis (menu Modal -> grup "BSL · Bot Order Proses 1F / 2F") ------------
+--     Kunci: bsl:bot_1f_bem … bsl:bot_2f_lem. Bila modal kombinasi = 0 / belum diisi, dipakai modal BEM / SEM / LEM Bot lama.
+do $$
+declare c record;
+begin
+    for c in select conname from pg_constraint
+              where conrelid = 'public.modal_items'::regclass and contype = 'c' and pg_get_constraintdef(oid) ilike '%item_key%' loop
+        execute format('alter table modal_items drop constraint %I', c.conname);
+    end loop;
+    alter table modal_items add constraint modal_items_item_key_check check (
+        item_key ~ '^(farm|hav|cat|pre):[0-9]+$' or item_key ~ '^sup:[0-9]+:(100|500|1000)$'
+        or item_key ~ '^bsl:(bem|sem|lem|bot_bem|bot_sem|bot_lem)$' or item_key ~ '^bsl:bot_(1f|2f)_(bem|sem|lem)$');
+end $$;
+
+-- daftar barang menu Modal (sama dengan koin-usdt-14 + 6 baris modal proses 1F / 2F)
+create or replace function md_all_items()
+returns table (key text, grup text, ikon text, ord integer, sub text, nama text, harga bigint, satuan text)
+language sql stable security definer set search_path = public, extensions as $$
+    select 'bsl:bem'::text, 'BSL · Langganan Harian'::text, '📈'::text, 0, ''::text, 'BEM'::text, coalesce((select bem from price_settings where id = 1), 0)::bigint, '/ tag / hari'::text
+    union all select 'bsl:sem', 'BSL · Langganan Harian', '📈', 0, '', 'SEM', coalesce((select sem from price_settings where id = 1), 0)::bigint, '/ tag / hari'
+    union all select 'bsl:lem', 'BSL · Langganan Harian', '📈', 0, '', 'LEM', coalesce((select lem from price_settings where id = 1), 0)::bigint, '/ tag / hari'
+    union all select 'bsl:bot_bem', 'BSL · Bot Order', '🤖', 0, '', 'BEM Bot', coalesce((select bot_bem from price_settings where id = 1), 0)::bigint, '/ tagar'
+    union all select 'bsl:bot_sem', 'BSL · Bot Order', '🤖', 0, '', 'SEM Bot', coalesce((select bot_sem from price_settings where id = 1), 0)::bigint, '/ tagar'
+    union all select 'bsl:bot_lem', 'BSL · Bot Order', '🤖', 0, '', 'LEM Bot', coalesce((select bot_lem from price_settings where id = 1), 0)::bigint, '/ tagar'
+    union all      -- modal khusus proses pengiriman 1F / 2F per jenis (migrasi 009); 0 = pakai modal BEM/SEM/LEM Bot di atas
+    select 'bsl:bot_' || lower(k.proses) || '_' || lower(d.dash), 'BSL · Bot Order Proses 1F / 2F', '📨', 0, k.proses::text,
+           (k.nama || ' · ' || d.dash)::text, coalesce(bot_pkg_price(k.proses, d.dash), 0)::bigint, '/ tagar'
+      from bot_packages k cross join (values ('BEM'), ('SEM'), ('LEM')) d(dash)
+    union all
+    select 'farm:' || b.id, 'Farm', '🌱', 1, '', b.nama::text, b.harga_koin::bigint, '/ token' from farm_batches b where b.etalase
+    union all
+    select 'hav:' || b.id, 'Hav Token', '🔑', 2, '', b.nama::text, b.harga_koin::bigint, '/ key' from hav_batches b where b.etalase
+    union all
+    select 'sup:' || b.id || ':100', 'Product (Supply & Stock)', '📦', 3, b.nama::text, (coalesce(nullif(b.item, ''), b.nama) || ' · 100 ' || b.satuan)::text, b.price_100::bigint, 'total' from supply_batches b where b.visible and b.price_100 > 0
+    union all
+    select 'sup:' || b.id || ':500', 'Product (Supply & Stock)', '📦', 3, b.nama::text, (coalesce(nullif(b.item, ''), b.nama) || ' · 500 ' || b.satuan)::text, b.price_500::bigint, 'total' from supply_batches b where b.visible and b.price_500 > 0
+    union all
+    select 'sup:' || b.id || ':1000', 'Product (Supply & Stock)', '📦', 3, b.nama::text, (coalesce(nullif(b.item, ''), b.nama) || ' · 1000 ' || b.satuan)::text, b.price_1000::bigint, 'total' from supply_batches b where b.visible and b.price_1000 > 0
+    union all
+    select 'pre:' || p.id, 'Pre Order', '📝', 4, '', p.nama::text, p.harga_koin::bigint, '/ 10.000 barang' from preorder_items p
+    union all
+    select 'cat:' || c.id, coalesce(k.nama, c.kategori)::text, coalesce(k.ikon, '🛍')::text, 10 + coalesce(k.urut, 99), c.kategori::text, c.nama::text, c.harga_koin::bigint, '/ item'
+      from catalog_items c left join catalog_categories k on k.slug = c.kategori where c.kategori <> 'farm';
+$$;
+revoke all on function md_all_items() from public, anon, authenticated;
+
+-- simpan modal: menerima kunci proses 1F / 2F (sama dengan koin-usdt-14 selain pola kunci)
+create or replace function md_save(p_pin text, p_items jsonb)
+returns integer language plpgsql security definer set search_path = public, extensions as $$
+declare r record; n integer := 0;
+begin
+    if not admin_verify_pin(p_pin) then raise exception 'PIN admin salah'; end if;
+    for r in select key, value from jsonb_each_text(coalesce(p_items, '{}'::jsonb)) loop
+        if not (r.key ~ '^(farm|hav|cat|pre):[0-9]+$' or r.key ~ '^sup:[0-9]+:(100|500|1000)$' or r.key ~ '^bsl:(bem|sem|lem|bot_bem|bot_sem|bot_lem)$' or r.key ~ '^bsl:bot_(1f|2f)_(bem|sem|lem)$') then
+            raise exception 'Kode barang tidak valid: %', r.key; end if;
+        if not (coalesce(r.value, '') ~ '^[0-9]{1,12}$') then raise exception 'Modal untuk % harus angka bulat >= 0', r.key; end if;
+        insert into modal_items (item_key, modal, updated_at) values (r.key, r.value::bigint, now())
+        on conflict (item_key) do update set modal = excluded.modal, updated_at = now();
+        n := n + 1;
+    end loop;
+    return n;
+end; $$;
+grant execute on function md_save(text, jsonb) to anon, authenticated;
 
 grant execute on function bot_daily_admin(text, integer), cu_bot_daily(uuid, integer), bot_approve(text, bigint) to anon, authenticated;
