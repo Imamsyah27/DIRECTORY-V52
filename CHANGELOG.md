@@ -100,6 +100,16 @@ Detail teknis per fitur juga ada di `UPDATE-13.md` bagian 19–23.
 - **Database:** order ke kombinasi nonaktif ditolak oleh `cu_request_bot_order` ("Pemesanan proses dan jenis ini sedang ditutup").
 - Tanpa request baru: data tetap dari `cu_bot_packages`, dengan cache 10 menit.
 
+### 10. Jam UTC live + batas jam kirim per proses (1F / 2F)
+- **Pelanggan:**
+  - Jam **HH:MM:SS UTC** live di bagian atas dashboard, dari jam browser, diperbarui tiap detik, **tanpa request**, berhenti saat tab disembunyikan.
+  - Di form Pesan Bot Order, kalau proses yang dipilih punya batas jam: tampil jam UTC live dan "batas kirim hari ini HH:MM UTC".
+  - Setelah batas jam: peringatan "Sudah lewat HH:MM UTC… dikirim besok mulai 00:00 UTC", notes **otomatis terisi** saran kirim besok (masih bisa diubah, tidak menimpa notes yang sudah ditulis pelanggan), dan pelanggan **tetap bisa memesan** (pre order untuk besok).
+  - Teks dalam 5 bahasa.
+- **Admin:** Price → Proses Pengiriman Bot → **⏰ Batas kirim hari ini (UTC)** per proses (misalnya 12:00 → 11:00), atau **Tanpa batas**. Default: **2F = 12:00 UTC**, **1F = tanpa batas**.
+- **Tanda 📅 Kirim besok** di daftar Bot Order admin dan pelanggan. Tanda ini dihitung **dari jam server (UTC)** saat pesanan dibuat (`bot_orders.kirim_besok`), jadi tidak bergantung pada jam HP pelanggan. Order lama: tanpa tanda.
+- Batas jam **tidak memblokir pemesanan**. Tidak ada request atau polling tambahan: batas jam ikut di data paket yang sudah di-cache. Fitur foto contoh dibatalkan.
+
 ---
 
 ## Urutan menjalankan migrasi (`/migrations`)
@@ -119,6 +129,7 @@ Syaratnya, semua SQL lama di `UPDATE-13.md` (sampai `koin-usdt-24b`) sudah perna
 | 8 | `migrations/008_bot_proses_batch.sql` | Proses 1F/2F (bagian 2): antrian & batch per proses + jenis, `bot_list` / `cu_my_bot_orders` membawa proses, `bot_search_tags` filter proses | 007 |
 | 9 | `migrations/009_bot_proses_total_bsl.sql` | Proses 1F/2F (bagian 3): total per hari 1F/2F, BSL Profit (keterangan + **modal khusus 1F/2F per jenis**, `md_all_items` / `md_save`), judul notifikasi Telegram | 008 |
 | 10 | `migrations/010_ketersediaan_bot_kombinasi.sql` | Ketersediaan Bot Order hanya per kombinasi 1F/2F × BEM/SEM/LEM; pengaturan lama `avail_bot_*` dipindah otomatis (sekali); `cu_request_bot_order` tanpa saklar lama | 007–009 |
+| 11 | `migrations/011_batas_jam_utc.sql` | Batas jam kirim per proses (`bot_packages.batas_utc`, default 2F 12:00 UTC) + `bot_orders.kirim_besok` dari jam server; `bot_pkg_set_batas`, `bot_pkg_list`, `cu_bot_packages`, `cu_request_bot_order`, `bot_list`, `cu_my_bot_orders` | 007–010 |
 
 ⚠️ **Jangan** menjalankan ulang `sql/koin-usdt-23-bot-batch.sql` / `23b` setelah migrasi 001 dan 004. Kalau dijalankan ulang, fungsi batch kembali ke versi lama dan bug Batch 1 muncul lagi.
 Kalau tidak sengaja terjalankan, jalankan ulang 001, lalu 004.
@@ -253,6 +264,17 @@ Lakukan untuk setiap jenis: **Bot Order, Bulk Order, Pesanan Baru, Perpanjang, K
    - nonaktifkan semua kombinasi 2F → pilih 2F → tampil "Belum tersedia" dan tombol Pesan nonaktif
 4. Console browser: `cuRpc("cu_request_bot_order", { p_dashboard: "LEM", p_proses: "2F", p_tagar_list: ["#x"] })` → ditolak "Pemesanan proses dan jenis ini sedang ditutup".
 5. Bulk Order dan langganan harian tetap bisa dipesan seperti biasa.
+
+### K. Jam UTC & batas jam kirim
+1. Jalankan `migrations/011_batas_jam_utc.sql`. Cek: `select proses, batas_utc from bot_packages;` → 1F `null`, 2F `720` (12:00 UTC).
+2. Pelanggan → dashboard: jam **HH:MM:SS UTC** berjalan tiap detik, sama dengan jam UTC di https://time.is/UTC. Di DevTools Network tidak ada request baru tiap detik.
+3. Admin → Price → Proses Pengiriman Bot → 2F → batas jam diisi **1 menit sebelum jam UTC sekarang** → Simpan.
+4. Pelanggan → Pesan Bot Order → pilih **2F**:
+   - jam live dan peringatan "Sudah lewat …" tampil, dan notes otomatis terisi "Kirim besok mulai 00:00 UTC …"
+   - pindah ke 1F → notes kembali kosong
+   - pesanan 2F tetap bisa dikirim → layar akhir "📅 Kirim besok"
+5. Admin → Bot Order → pesanan itu berlabel **📅 Kirim besok**. Cek: `select id, proses, kirim_besok, created_at from bot_orders order by id desc limit 1;` → `kirim_besok = true`.
+6. Kembalikan batas 2F ke 12:00 (atau 11:00). Centang **Tanpa batas** → kotak jam tidak tampil lagi di form pelanggan.
 
 ---
 

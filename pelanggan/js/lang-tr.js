@@ -495,3 +495,12 @@ Object.assign(TRANSLATIONS.tr, {
 });
 Object.assign(TRANSLATIONS.tr, { bo_combo_off: "Bu süreç ve tür için siparişler şu anda kapalı" });
 Object.assign(TRANSLATIONS.tr, { bo_combo_none: "Henüz mevcut değil" });
+
+/* Jam UTC + batas jam kirim (Bot Order) */
+Object.assign(TRANSLATIONS.tr, {
+    utc_now: "UTC saati",
+    bo_batas_info: "bugünkü gönderim sınırı {t} UTC",
+    bo_batas_lewat: "Saat {t} UTC geçti. Sipariş bugün gönderilemez, yarın 00:00 UTC'den itibaren gönderilir. Yine de şimdi sipariş verebilirsiniz (yarın için ön sipariş).",
+    bo_batas_note: "Yarın 00:00 UTC'den itibaren gönder ({t} UTC'den sonra sipariş verildi)",
+    bo_kirim_besok: "📅 Yarın gönderilecek"
+});

@@ -554,3 +554,33 @@ Object.assign(TRANSLATIONS.id, { bo_combo_none: "Belum tersedia" });
 Object.assign(TRANSLATIONS.en, { bo_combo_none: "Not available yet" });
 Object.assign(TRANSLATIONS.vi, { bo_combo_none: "Chưa khả dụng" });
 Object.assign(TRANSLATIONS.ar, { bo_combo_none: "غير متاح بعد" });
+
+/* Jam UTC + batas jam kirim (Bot Order) */
+Object.assign(TRANSLATIONS.id, {
+    utc_now: "Jam UTC",
+    bo_batas_info: "batas kirim hari ini {t} UTC",
+    bo_batas_lewat: "Sudah lewat {t} UTC. Pesanan tidak bisa dikirim hari ini dan dikirim besok mulai 00:00 UTC. Anda tetap bisa memesan sekarang (pre order untuk besok).",
+    bo_batas_note: "Kirim besok mulai 00:00 UTC (dipesan setelah {t} UTC)",
+    bo_kirim_besok: "📅 Kirim besok"
+});
+Object.assign(TRANSLATIONS.en, {
+    utc_now: "UTC time",
+    bo_batas_info: "today's delivery cutoff {t} UTC",
+    bo_batas_lewat: "It is past {t} UTC. This order cannot be delivered today and will be delivered tomorrow from 00:00 UTC. You can still order now (pre-order for tomorrow).",
+    bo_batas_note: "Deliver tomorrow from 00:00 UTC (ordered after {t} UTC)",
+    bo_kirim_besok: "📅 Deliver tomorrow"
+});
+Object.assign(TRANSLATIONS.vi, {
+    utc_now: "Giờ UTC",
+    bo_batas_info: "hạn gửi hôm nay {t} UTC",
+    bo_batas_lewat: "Đã qua {t} UTC. Đơn không thể gửi hôm nay và sẽ được gửi vào ngày mai từ 00:00 UTC. Bạn vẫn có thể đặt ngay bây giờ (đặt trước cho ngày mai).",
+    bo_batas_note: "Gửi vào ngày mai từ 00:00 UTC (đặt sau {t} UTC)",
+    bo_kirim_besok: "📅 Gửi ngày mai"
+});
+Object.assign(TRANSLATIONS.ar, {
+    utc_now: "توقيت UTC",
+    bo_batas_info: "آخر موعد للإرسال اليوم {t} UTC",
+    bo_batas_lewat: "تجاوزت الساعة {t} UTC. لا يمكن إرسال الطلب اليوم وسيُرسل غداً بدءاً من 00:00 UTC. يمكنك الطلب الآن (طلب مسبق للغد).",
+    bo_batas_note: "الإرسال غداً بدءاً من 00:00 UTC (طُلب بعد {t} UTC)",
+    bo_kirim_besok: "📅 يُرسل غداً"
+});

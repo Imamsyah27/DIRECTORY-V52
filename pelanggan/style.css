@@ -319,3 +319,9 @@ body{
 .bo-rules-title{ font-weight:700; margin-bottom:4px; } .bo-rules-body{ white-space:pre-wrap; word-break:break-word; }
 .bo-prochip{ background:rgba(37,99,235,.14); }
 
+/* Jam UTC live + batas jam kirim */
+.utc-clock{ margin-top:6px; font-size:12.5px; color:var(--text-secondary); } .utc-clock b{ font-variant-numeric:tabular-nums; color:var(--text-primary, inherit); }
+.bo-utc{ margin-top:8px; padding:9px 12px; border-radius:12px; border:1px solid var(--border); font-size:13px; font-variant-numeric:tabular-nums; }
+.bo-utc.lewat{ border-color:rgba(217,119,6,.55); background:rgba(217,119,6,.10); }
+.bo-utc-warn{ margin-top:4px; font-weight:700; color:#b45309; }
+.bo-besok{ background:rgba(217,119,6,.18); }

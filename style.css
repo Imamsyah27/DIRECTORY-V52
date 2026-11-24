@@ -1494,3 +1494,6 @@ tr.bb-total td{ border-top:2px solid var(--border); }
 input[type=number]:disabled{ opacity:.6; cursor:not-allowed; }
 .bpk-tg{ min-width:112px; }
 
+/* Bot Order: batas jam kirim (UTC) */
+.bpk-batas-row{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; } .bpk-batas-row input[type=time]{ width:130px; }
+.chip.bo-besok{ background:rgba(217,119,6,.18); }

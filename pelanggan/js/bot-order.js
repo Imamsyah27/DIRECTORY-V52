@@ -72,7 +72,7 @@ async function openBotOrderModal() {
     cuPriceInfo = null;
     await Promise.all([ensurePriceInfo(), ensureBotPkgs()]);     // ketersediaan BEM/SEM/LEM + proses (cache)
     const pkgs = cuBotPkgs || [];
-    const st = { pro: "", pkg: "" };       // 1 pesanan = 1 proses + 1 jenis
+    const st = { pro: "", pkg: "", autoNote: "" };       // 1 pesanan = 1 proses + 1 jenis; autoNote = saran notes yang diisi otomatis
     $("modalBox").innerHTML = `
         <div class="rn-head"><div class="rn-icon">🤖</div>
             <div><div class="modal-title" style="margin:0">${escapeHtml(t("bo_title"))}</div><div class="rn-sub">${escapeHtml(t("bo_sub_proses"))}</div></div></div>
@@ -80,7 +80,8 @@ async function openBotOrderModal() {
             ${pkgs.length ? `<select id="boProses" class="bo-proses-select"><option value="" selected disabled>${escapeHtml(t("bo_proses_ph"))}</option>
                 ${pkgs.map(k => `<option value="${escapeHtml(k.proses)}">${escapeHtml(k.nama)}</option>`).join("")}</select>`
                 : `<div class="price-none">${escapeHtml(t(cuBotPkgsMissing ? "rn_err_not_ready" : "bo_proses_none"))}</div>`}
-            <div class="bo-rules" id="boRules" style="display:none;"></div></div>
+            <div class="bo-rules" id="boRules" style="display:none;"></div>
+            <div class="bo-utc" id="boUtc" style="display:none;"></div></div>
         <div class="rn-block"><div class="rn-label">${escapeHtml(t("bo_pkg"))}</div>
             <div class="rn-pkgs" id="boPkgs">${BO_PKGS.map(p => `<button type="button" class="rn-pkg" data-pkg="${p}" style="display:none;"><b>${p} Bot</b><small class="rn-pkg-price" id="boPP_${p}">-</small></button>`).join("")}</div>
             <div class="price-none" id="boPkgNone"></div></div>
@@ -119,7 +120,27 @@ async function openBotOrderModal() {
                <div class="price-row total"><span>${escapeHtml(t("bo_total"))}</span><b>${fmtRp(p * n)}</b></div>${priceExtraHtml(p * n)}`;
         $("boYes").disabled = !(st.pro && st.pkg);
     };
-    if ($("boProses")) $("boProses").addEventListener("change", e => { st.pro = e.target.value; sync(); });
+    /* batas jam kirim hari ini (UTC, diatur admin per proses). Lewat batas = tetap boleh pesan, dikirim besok mulai 00:00 UTC.
+       Jam dari browser hanya untuk tampilan; tanda "kirim besok" yang dipakai admin dihitung server dari jam server. */
+    const deadline = () => {
+        const box = $("boUtc"), k = botPkgOf(st.pro), note = $("boNote"); if (!box) return false;
+        const batas = k && k.batas_utc != null ? Number(k.batas_utc) : null;
+        const lewat = batas != null && utcMinutesNow() >= batas;
+        box.style.display = batas == null ? "none" : "block";
+        if (batas != null) {
+            const hm = fmtUtcHM(batas);
+            box.className = "bo-utc" + (lewat ? " lewat" : "");
+            box.innerHTML = `<div class="bo-utc-row">🕒 ${escapeHtml(t("utc_now"))}: <b>${escapeHtml(utcClockText())}</b> · ${escapeHtml(t("bo_batas_info", { t: hm }))}</div>`
+                + (lewat ? `<div class="bo-utc-warn">⚠️ ${escapeHtml(t("bo_batas_lewat", { t: hm }))}</div>` : "");
+        }
+        // saran notes otomatis: diisi bila kolom kosong; dihapus lagi bila tidak berlaku & belum diubah pelanggan
+        const saran = lewat ? t("bo_batas_note", { t: fmtUtcHM(batas) }) : "";
+        if (saran && !note.value.trim()) { note.value = saran; st.autoNote = saran; }
+        else if (!saran && st.autoNote && note.value === st.autoNote) { note.value = ""; st.autoNote = ""; }
+        return lewat;
+    };
+    const stopTick = onUtcTick(() => { if (!$("boUtc")) { stopTick(); return; } deadline(); });   // berhenti sendiri saat form ditutup
+    if ($("boProses")) $("boProses").addEventListener("change", e => { st.pro = e.target.value; sync(); deadline(); });
     $("boPkgs").addEventListener("click", e => { const c = e.target.closest(".rn-pkg"); if (c && !c.disabled) { st.pkg = c.dataset.pkg; sync(); } });
     $("boTags").addEventListener("input", sync);
     $("boNo").addEventListener("click", closeModal);
@@ -151,6 +172,7 @@ async function openBotOrderModal() {
         loadBotOrders(); if (typeof loadCoin === "function") loadCoin();
         $("modalBox").innerHTML = `<div class="modal-icon success">🤖</div><div class="modal-title">${escapeHtml(t("bo_sent_title"))}</div>
             <div class="modal-sub">${escapeHtml(t("bo_sent_text", { n: data.jumlah, pkg: label, total: fmtRp(data.total) }))}</div>
+            ${data.kirim_besok ? `<div class="bo-utc lewat" style="display:block;"><div class="bo-utc-warn">${escapeHtml(t("bo_kirim_besok"))} · 00:00 UTC</div></div>` : ""}
             <div class="modal-actions"><button type="button" class="btn btn-primary" id="boDone">${escapeHtml(t("bo_close"))}</button></div>`;
         $("boDone").addEventListener("click", closeModal);
     });
@@ -219,7 +241,7 @@ function renderBotOrders() {
     box.innerHTML = list.map(r => { const k = botState(r), open = botTagOpen.has(r.id), bi = botBatchInfo[r.id];
         const partial = bi && k === "kirim" && bi.sent > 0 && bi.sent < bi.total;
         const stText = partial ? t("bb_partial", { a: bi.sent, b: bi.total }) : t(stl[k] || "bo_st_pending"); return `
-        <div class="bo-item bo-s-${k}"><div><b>${r.dashboard === "BULK" ? "🧺 " + escapeHtml(t("bk_label")) : escapeHtml(r.dashboard) + " Bot"}</b>${r.proses ? ` <span class="bo-pkgchip bo-prochip">📨 ${escapeHtml(botProName(r.proses))}</span>` : ""}${r.dashboard === "BULK" && botPkg !== "all" ? ` <span class="bo-pkgchip">${escapeHtml(t("bo_pkg_tags", { pkg: botPkg, n: r["n_" + botPkgKey(botPkg)] }))}</span>` : ""} · <button type="button" class="bo-count" data-botags="${r.id}" aria-expanded="${open}" title="${escapeHtml(t("bo_tags_view"))}">${open ? "▾" : "▸"} ${escapeHtml(t("bo_tags_n", { n: r.jumlah }))}</button>${r.arsip ? ` <span class="bo-arch">🗂️ ${escapeHtml(t("bo_arch_tag"))}</span>` : ""}
+        <div class="bo-item bo-s-${k}"><div><b>${r.dashboard === "BULK" ? "🧺 " + escapeHtml(t("bk_label")) : escapeHtml(r.dashboard) + " Bot"}</b>${r.proses ? ` <span class="bo-pkgchip bo-prochip">📨 ${escapeHtml(botProName(r.proses))}</span>` : ""}${r.kirim_besok ? ` <span class="bo-pkgchip bo-besok">${escapeHtml(t("bo_kirim_besok"))}</span>` : ""}${r.dashboard === "BULK" && botPkg !== "all" ? ` <span class="bo-pkgchip">${escapeHtml(t("bo_pkg_tags", { pkg: botPkg, n: r["n_" + botPkgKey(botPkg)] }))}</span>` : ""} · <button type="button" class="bo-count" data-botags="${r.id}" aria-expanded="${open}" title="${escapeHtml(t("bo_tags_view"))}">${open ? "▾" : "▸"} ${escapeHtml(t("bo_tags_n", { n: r.jumlah }))}</button>${r.arsip ? ` <span class="bo-arch">🗂️ ${escapeHtml(t("bo_arch_tag"))}</span>` : ""}
             <div class="bo-item-sub">${r.dashboard === "BULK" ? `BEM ${r.n_bem} · SEM ${r.n_sem} · LEM ${r.n_lem}` : escapeHtml(r.tagar_pertama || "") + (r.jumlah > 1 ? " …" : "")} · ${fmt(r.created_at, false)}</div>
             ${r.dikirim_at ? `<div class="bo-item-sub">${escapeHtml(t("bo_sent_on", { d: fmt(r.dikirim_at, true) }))}</div>` : ""}
             ${r.catatan_admin ? `<div class="bo-item-sub">💬 ${escapeHtml(r.catatan_admin)}</div>` : ""}${botBatchHtml(r)}${(() => { const h = botQ && botHit(r); return typeof h === "string" ? `<div class="bo-hit">🔎 ${escapeHtml(h)}</div>` : ""; })()}</div>

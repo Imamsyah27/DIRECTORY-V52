@@ -21,6 +21,7 @@ async function bpkLoad() {
     BPK.rows = data || []; BPK.loaded = true; bpkRender();
 }
 const BPK_DASH = ["BEM", "SEM", "LEM"];
+const bpkHM = m => String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
 /** status 1 kombinasi untuk ditampilkan admin */
 function bpkState(pro) {
     const aktif = bpkEl("bpkAktif_" + pro).checked;
@@ -49,6 +50,10 @@ function bpkRender() {
                     <td><span class="bpk-st" id="bpkSt_${r.proses}_${d}"></span></td></tr>`; }).join("")}
             </tbody></table></div>
             <small class="muted-note">Pelanggan hanya melihat & bisa memesan kombinasi yang <b>Aktif</b> dan harganya lebih dari 0 (dicek juga di server). Tekan <b>Simpan</b> setelah mengubah.</small>
+            <div class="field bpk-batas"><label for="bpkBatas_${r.proses}">⏰ Batas kirim hari ini (UTC)</label>
+                <div class="bpk-batas-row"><input type="time" step="60" id="bpkBatas_${r.proses}" value="${r.batas_utc != null ? bpkHM(r.batas_utc) : "12:00"}" ${r.batas_utc == null ? "disabled" : ""}>
+                    <label class="pr-check"><input type="checkbox" id="bpkTanpa_${r.proses}" data-bpkbatas="${r.proses}" ${r.batas_utc == null ? "checked" : ""}> <span>Tanpa batas</span></label></div>
+                <small class="muted-note">Bukan penutup pemesanan: pesanan setelah jam ini tetap diterima (pre order), diberi label <b>📅 Kirim besok</b> (mulai 00:00 UTC, dihitung dari jam server) dan notes pelanggan otomatis berisi saran kirim besok.</small></div>
             <div class="field"><label for="bpkNotes_${r.proses}">Notes / rules untuk pelanggan</label>
                 <textarea id="bpkNotes_${r.proses}" rows="4" maxlength="2000" placeholder="Contoh: proses 1x24 jam, pastikan akun tidak sedang dipakai, …">${escapeHtml(r.notes || "")}</textarea></div>
             <button type="button" class="btn btn-primary" data-bpksave="${r.proses}">💾 Simpan ${escapeHtml(r.proses)}</button>
@@ -57,6 +62,8 @@ function bpkRender() {
     if (!BPK.bound) {
         BPK.bound = true;
         box.addEventListener("click", e => {
+            const tb = e.target.closest("[data-bpkbatas]");
+            if (tb) { bpkEl("bpkBatas_" + tb.dataset.bpkbatas).disabled = tb.checked; return; }
             const tg = e.target.closest("[data-bpktg]");
             if (tg) { const [pro, d] = tg.dataset.bpktg.split("_"), c = bpkEl(`bpkBuka_${pro}_${d}`); c.checked = !c.checked; bpkState(pro); return; }
             const b = e.target.closest("[data-bpksave]"); if (b) bpkSave(b.dataset.bpksave, b);
@@ -72,8 +79,20 @@ async function bpkSave(pro, btn) {
         p_harga_bem: n(`bpkHarga_${pro}_BEM`), p_harga_sem: n(`bpkHarga_${pro}_SEM`), p_harga_lem: n(`bpkHarga_${pro}_LEM`),
         p_buka_bem: bpkEl(`bpkBuka_${pro}_BEM`).checked, p_buka_sem: bpkEl(`bpkBuka_${pro}_SEM`).checked, p_buka_lem: bpkEl(`bpkBuka_${pro}_LEM`).checked };
     if (!payload.p_nama) { showToast("Nama proses wajib diisi", "danger"); return; }
+    // batas jam (UTC) dalam menit; kosong = tanpa batas
+    let batas = null;
+    if (!bpkEl("bpkTanpa_" + pro).checked) {
+        const m = /^(\d{2}):(\d{2})/.exec(bpkEl("bpkBatas_" + pro).value || "");
+        if (!m) { showToast("Isi batas jam (UTC) atau centang Tanpa batas", "danger"); return; }
+        batas = Number(m[1]) * 60 + Number(m[2]);
+    }
     BPK.busy = true; btn.disabled = true;
-    const { error } = await supabaseClient.rpc("bot_pkg_save", payload);
+    let { error } = await supabaseClient.rpc("bot_pkg_save", payload);
+    if (!error) {
+        const r2 = await supabaseClient.rpc("bot_pkg_set_batas", { p_pin: bpkPin(), p_proses: pro, p_batas_utc: batas });
+        if (r2.error) error = /does not exist|schema cache|Could not find the function/i.test(r2.error.message || "")
+            ? { message: "Batas jam belum bisa disimpan — jalankan dulu migrations/011_batas_jam_utc.sql" } : r2.error;
+    }
     BPK.busy = false; btn.disabled = false;
     if (error) {
         if ((error.message || "").includes("PIN admin salah")) { sessionStorage.removeItem("akun_admin_pin"); showToast("PIN admin tidak valid, masukkan ulang", "danger"); return; }
