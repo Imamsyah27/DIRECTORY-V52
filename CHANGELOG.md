@@ -79,7 +79,7 @@ Detail teknis per fitur juga ada di `UPDATE-13.md` bagian 19–23.
 - **1 pesanan = 1 proses + 1 jenis.** Pelanggan memilih proses lewat dropdown **"Pilih proses pengiriman"** (1F / 2F), lalu memilih **BEM / SEM / LEM**, mengisi tagar, dan membaca **notes/rules** proses itu yang diatur admin. Campuran proses atau jenis dalam satu pesanan dikunci di database (`cu_request_bot_order`).
 - **Harga dan buka/tutup per kombinasi** diatur di **Price → Proses Pengiriman Bot (1F / 2F)**. Ada 6 kombinasi (**1F-BEM, 1F-SEM, 1F-LEM, 2F-BEM, 2F-SEM, 2F-LEM**), masing-masing dengan harga per tagar, saklar **Dibuka**, dan status (✅ Dibuka / 🔒 Ditutup / ⚠️ Harga 0).
   - Per proses diatur juga nama, notes/rules, dan aktif/nonaktif.
-  - Kombinasi bisa dipesan bila prosesnya aktif, kombinasinya dibuka, harganya lebih dari 0, dan ketersediaan BEM/SEM/LEM di panel "Ketersediaan" (saklar utama) menyala. Semua syarat ini dicek juga di server.
+  - Kombinasi bisa dipesan bila prosesnya aktif, kombinasinya aktif, dan harganya lebih dari 0. Semua syarat ini dicek juga di server. Sejak migrasi 010, saklar lama "BEM / SEM / LEM Bot tersedia" tidak dipakai lagi (lihat bagian 9).
   - **Harga custom per pelanggan** memakai `price_item` (kunci `bot:1F:BEM` …), muncul di menu Custom Price / Harga Pelanggan.
   - Harga **dihitung ulang di server**; harga dari browser tidak dipakai.
 - Kolom baru `bot_orders.proses` / `bot_queue.proses`. **Order lama tetap aman** (proses kosong, tampil "tanpa proses"). **Bulk Order tidak berubah.**
@@ -91,6 +91,14 @@ Detail teknis per fitur juga ada di `UPDATE-13.md` bagian 19–23.
 - Pengaturan proses di browser pelanggan **di-cache 10 menit** dan dihapus otomatis saat admin mengubahnya. Tidak ada polling baru, dan tidak ada `select *`.
 - **Harga bot lama dikunci:** panel Price "Harga Bot Order (lama)" dan kolom 🤖 Bot di **Custom Price** / **Harga Pelanggan** diberi label 🔒 dan tidak bisa diedit, karena tidak dipakai lagi untuk pesanan baru. Nilai lama tetap tersimpan sebagai acuan (pratinjau modal BSL Profit, saran harga). Tidak ada benturan harga: pesanan baru hanya memakai harga proses.
 - **Modal khusus 1F / 2F:** menu **Modal** → grup "BSL · Bot Order Proses 1F / 2F", 6 isian (1F-BEM … 2F-LEM). Saat pesanan disetujui, BSL Profit memakai modal kombinasi itu. Kalau masih 0 atau kosong, dipakai modal BEM / SEM / LEM Bot lama.
+
+### 9. Ketersediaan Bot Order per kombinasi 1F / 2F × BEM / SEM / LEM
+- **Admin:** Price → **Proses Pengiriman Bot**. Setiap kombinasi (1F-BEM, 1F-SEM, 1F-LEM, 2F-BEM, 2F-SEM, 2F-LEM) punya tombol **✅ Aktif / ⛔ Nonaktif** sendiri, lalu **Simpan**. Ini sekarang satu-satunya pengaturan ketersediaan Bot Order.
+- Centang lama **"BEM / SEM / LEM Bot tersedia"** di panel Ketersediaan **dikunci** dengan label "dipindah ke Proses 1F / 2F". Ketersediaan **langganan harian** tidak berubah.
+- **Pengaturan lama dipindah otomatis satu kali** (migrasi 010): kalau "BEM Bot tersedia" dulu mati, 1F-BEM dan 2F-BEM ikut nonaktif, dan seterusnya. Penanda `avail_lama_dipindah` mencegah pengaturan admin tertimpa saat file dijalankan ulang.
+- **Pelanggan:** setelah memilih 1F / 2F, hanya BEM / SEM / LEM yang **aktif** yang tampil. Kalau hanya satu yang aktif, jenis itu otomatis terpilih. Kalau semuanya nonaktif, tampil **"Belum tersedia"** (5 bahasa) dan tombol Pesan nonaktif.
+- **Database:** order ke kombinasi nonaktif ditolak oleh `cu_request_bot_order` ("Pemesanan proses dan jenis ini sedang ditutup").
+- Tanpa request baru: data tetap dari `cu_bot_packages`, dengan cache 10 menit.
 
 ---
 
@@ -110,6 +118,7 @@ Syaratnya, semua SQL lama di `UPDATE-13.md` (sampai `koin-usdt-24b`) sudah perna
 | 7 | `migrations/007_bot_proses_1f_2f.sql` | Proses 1F/2F (bagian 1): kolom `proses`, tabel `bot_packages`, harga custom (`price_item` + `pi_catalog`), `bot_pkg_list/save`, `cu_bot_packages`, `cu_request_bot_order` wajib proses | 001–006 |
 | 8 | `migrations/008_bot_proses_batch.sql` | Proses 1F/2F (bagian 2): antrian & batch per proses + jenis, `bot_list` / `cu_my_bot_orders` membawa proses, `bot_search_tags` filter proses | 007 |
 | 9 | `migrations/009_bot_proses_total_bsl.sql` | Proses 1F/2F (bagian 3): total per hari 1F/2F, BSL Profit (keterangan + **modal khusus 1F/2F per jenis**, `md_all_items` / `md_save`), judul notifikasi Telegram | 008 |
+| 10 | `migrations/010_ketersediaan_bot_kombinasi.sql` | Ketersediaan Bot Order hanya per kombinasi 1F/2F × BEM/SEM/LEM; pengaturan lama `avail_bot_*` dipindah otomatis (sekali); `cu_request_bot_order` tanpa saklar lama | 007–009 |
 
 ⚠️ **Jangan** menjalankan ulang `sql/koin-usdt-23-bot-batch.sql` / `23b` setelah migrasi 001 dan 004. Kalau dijalankan ulang, fungsi batch kembali ke versi lama dan bug Batch 1 muncul lagi.
 Kalau tidak sengaja terjalankan, jalankan ulang 001, lalu 004.
@@ -232,6 +241,18 @@ Lakukan untuk setiap jenis: **Bot Order, Bulk Order, Pesanan Baru, Perpanjang, K
 8. **Harga lama terkunci:** Price → "Harga Bot Order (lama) 🔒", serta kolom 🤖 Bot di Custom Price / Harga Pelanggan, tampil abu-abu dan tidak bisa diubah.
 9. Total per hari: kolom 1F / 2F di admin, dan pilihan 1F / 2F di panel pelanggan.
 10. **Bulk Order dan langganan harian** tetap seperti sebelumnya. Login pelanggan dan cancel order tetap berfungsi.
+
+### J. Ketersediaan per kombinasi
+1. Sebelum menjalankan 010, catat centang lama di Price → Ketersediaan → Bot Order (misalnya LEM Bot mati). Jalankan `migrations/010_ketersediaan_bot_kombinasi.sql`.
+   - Cek: `select proses, buka_bem, buka_sem, buka_lem, avail_lama_dipindah from bot_packages;` → 1F dan 2F sama-sama `buka_lem = false`, dan `avail_lama_dipindah = true`.
+   - Jalankan file 010 sekali lagi → nilai tidak berubah.
+2. Admin → Price → Proses Pengiriman Bot: tekan tombol **2F · LEM** sampai ⛔ Nonaktif, lalu **1F · LEM** sampai ✅ Aktif (harga > 0) → Simpan. Centang "Bot tersedia" di panel Ketersediaan tampil terkunci.
+3. Pelanggan → Pesan Bot Order:
+   - pilih **1F** → BEM / SEM / LEM yang aktif saja yang tampil
+   - pilih **2F** → LEM tidak tampil
+   - nonaktifkan semua kombinasi 2F → pilih 2F → tampil "Belum tersedia" dan tombol Pesan nonaktif
+4. Console browser: `cuRpc("cu_request_bot_order", { p_dashboard: "LEM", p_proses: "2F", p_tagar_list: ["#x"] })` → ditolak "Pemesanan proses dan jenis ini sedang ditutup".
+5. Bulk Order dan langganan harian tetap bisa dipesan seperti biasa.
 
 ---
 

@@ -550,3 +550,7 @@ Object.assign(TRANSLATIONS.id, { bo_combo_off: "Pemesanan untuk proses dan jenis
 Object.assign(TRANSLATIONS.en, { bo_combo_off: "Orders for this process and type are currently closed" });
 Object.assign(TRANSLATIONS.vi, { bo_combo_off: "Đặt đơn cho quy trình và loại này đang tạm đóng" });
 Object.assign(TRANSLATIONS.ar, { bo_combo_off: "الطلبات لهذه الطريقة وهذا النوع مغلقة حالياً" });
+Object.assign(TRANSLATIONS.id, { bo_combo_none: "Belum tersedia" });
+Object.assign(TRANSLATIONS.en, { bo_combo_none: "Not available yet" });
+Object.assign(TRANSLATIONS.vi, { bo_combo_none: "Chưa khả dụng" });
+Object.assign(TRANSLATIONS.ar, { bo_combo_none: "غير متاح بعد" });

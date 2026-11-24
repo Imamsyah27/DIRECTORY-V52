@@ -1492,4 +1492,5 @@ tr.bb-total td{ border-top:2px solid var(--border); }
 /* harga bot lama: dikunci (diganti harga proses 1F / 2F) */
 .bot-old-note{ margin:6px 0 10px; padding:8px 12px; border-radius:10px; font-size:12.5px; background:rgba(217,119,6,.10); border:1px dashed rgba(217,119,6,.5); }
 input[type=number]:disabled{ opacity:.6; cursor:not-allowed; }
+.bpk-tg{ min-width:112px; }
 

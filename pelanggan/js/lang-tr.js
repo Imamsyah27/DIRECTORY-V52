@@ -494,3 +494,4 @@ Object.assign(TRANSLATIONS.tr, {
     bo_proses_all: "Tüm süreçler"
 });
 Object.assign(TRANSLATIONS.tr, { bo_combo_off: "Bu süreç ve tür için siparişler şu anda kapalı" });
+Object.assign(TRANSLATIONS.tr, { bo_combo_none: "Henüz mevcut değil" });

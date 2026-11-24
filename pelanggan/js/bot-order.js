@@ -82,7 +82,8 @@ async function openBotOrderModal() {
                 : `<div class="price-none">${escapeHtml(t(cuBotPkgsMissing ? "rn_err_not_ready" : "bo_proses_none"))}</div>`}
             <div class="bo-rules" id="boRules" style="display:none;"></div></div>
         <div class="rn-block"><div class="rn-label">${escapeHtml(t("bo_pkg"))}</div>
-            <div class="rn-pkgs" id="boPkgs">${BO_PKGS.map(p => `<button type="button" class="rn-pkg" data-pkg="${p}"><b>${p} Bot</b><small class="rn-pkg-price" id="boPP_${p}">-</small></button>`).join("")}</div></div>
+            <div class="rn-pkgs" id="boPkgs">${BO_PKGS.map(p => `<button type="button" class="rn-pkg" data-pkg="${p}" style="display:none;"><b>${p} Bot</b><small class="rn-pkg-price" id="boPP_${p}">-</small></button>`).join("")}</div>
+            <div class="price-none" id="boPkgNone"></div></div>
         <div class="rn-block"><label class="rn-label" for="boTags">${escapeHtml(t("bo_tags_label"))} <span class="no-count" id="boCount"></span></label>
             <textarea id="boTags" class="no-area" rows="5" placeholder="${escapeHtml(t("bo_tag_ph"))}" autocomplete="off"></textarea>
             <div class="rn-hint">${escapeHtml(t("bo_tags_hint"))}</div></div>
@@ -97,18 +98,23 @@ async function openBotOrderModal() {
         // notes / rules dari admin untuk proses yang dipilih
         $("boRules").style.display = k && k.notes ? "block" : "none";
         $("boRules").innerHTML = k && k.notes ? `<div class="bo-rules-title">📋 ${escapeHtml(t("bo_proses_rules"))} · ${escapeHtml(k.nama)}</div><div class="bo-rules-body">${linkify(k.notes)}</div>` : "";
-        // tombol BEM / SEM / LEM: harga kombinasi; jenis tanpa harga / tidak tersedia tidak bisa dipilih
+        // tombol BEM / SEM / LEM: HANYA kombinasi yang aktif untuk proses ini yang tampil
+        // (cu_bot_packages hanya mengirim kombinasi aktif & berharga; ketersediaan diatur per kombinasi di admin)
+        let nOk = 0;
         BO_PKGS.forEach(p => {
             const btn = $("boPkgs").querySelector(`[data-pkg="${p}"]`), pr = boPrice(st.pro, p), nm = boNormal(st.pro, p);
-            const ok = !!st.pro && pr > 0 && pkgAvail(p, true);
-            btn.disabled = !ok; btn.classList.toggle("on", ok && st.pkg === p);
-            $("boPP_" + p).innerHTML = !st.pro ? "-" : pr > 0 ? (nm > pr ? `<s>${fmtRp(nm)}</s> ` : "") + "<b>" + fmtRp(pr) + "</b>" + escapeHtml(t("bo_per_tag")) : escapeHtml(t("av_off"));
+            const ok = !!st.pro && pr > 0; if (ok) nOk++;
+            btn.style.display = ok ? "" : "none"; btn.disabled = !ok; btn.classList.toggle("on", ok && st.pkg === p);
+            $("boPP_" + p).innerHTML = ok ? (nm > pr ? `<s>${fmtRp(nm)}</s> ` : "") + "<b>" + fmtRp(pr) + "</b>" + escapeHtml(t("bo_per_tag")) : "";
         });
-        if (st.pkg && !(boPrice(st.pro, st.pkg) > 0 && pkgAvail(st.pkg, true))) st.pkg = "";
+        $("boPkgNone").textContent = !st.pro ? t("bo_err_proses") : nOk ? "" : t("bo_combo_none");
+        $("boPkgNone").style.display = !st.pro || !nOk ? "block" : "none";
+        if (st.pkg && !(boPrice(st.pro, st.pkg) > 0)) st.pkg = "";
+        if (!st.pkg && nOk === 1) st.pkg = BO_PKGS.find(p => boPrice(st.pro, p) > 0);      // hanya 1 jenis aktif: langsung terpilih
         const n = parseTags($("boTags").value).length, p = st.pro && st.pkg ? boPrice(st.pro, st.pkg) : 0;
         $("boCount").textContent = n ? "· " + t("bo_tags_n", { n }) : "";
         $("boPriceLines").innerHTML = !st.pro ? `<div class="price-none">${escapeHtml(t("bo_err_proses"))}</div>`
-            : !st.pkg ? `<div class="price-none">${escapeHtml(t("bo_err_pkg"))}</div>`
+            : !st.pkg ? `<div class="price-none">${escapeHtml(t(nOk ? "bo_err_pkg" : "bo_combo_none"))}</div>`
             : `<div class="price-row sub"><span>${escapeHtml(botProName(st.pro))} · ${st.pkg} — ${escapeHtml(t("bo_calc", { n: n || 0, p: fmtRp(p) }))}</span><span>${fmtRp(p * n)}</span></div>
                <div class="price-row total"><span>${escapeHtml(t("bo_total"))}</span><b>${fmtRp(p * n)}</b></div>${priceExtraHtml(p * n)}`;
         $("boYes").disabled = !(st.pro && st.pkg);
@@ -125,7 +131,6 @@ async function openBotOrderModal() {
         if (!st.pkg) { showToast(t("bo_err_pkg"), "danger"); return; }
         const p = boPrice(st.pro, st.pkg);
         if (!p) { showToast(t("bo_err_price"), "danger"); return; }
-        if (!pkgAvail(st.pkg, true)) { showToast(t("av_err_bot"), "danger"); return; }
         if (!tags.length) { showToast(t("bo_err_tag"), "danger"); $("boTags").focus(); return; }
         if (tags.length > 500) { showToast(t("bo_err_max"), "danger"); return; }
         const total = p * tags.length, label = st.pkg + " Bot · " + botProName(st.pro);
