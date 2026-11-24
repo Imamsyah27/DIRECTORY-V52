@@ -493,3 +493,4 @@ Object.assign(TRANSLATIONS.tr, {
     bo_proses_off: "Bu teslimat süreci şu anda kullanılamıyor",
     bo_proses_all: "Tüm süreçler"
 });
+Object.assign(TRANSLATIONS.tr, { bo_combo_off: "Bu süreç ve tür için siparişler şu anda kapalı" });

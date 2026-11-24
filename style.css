@@ -1487,4 +1487,6 @@ tr.bb-total td{ border-top:2px solid var(--border); }
 .bpk-head{ display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; } .bpk-head b{ font-size:18px; }
 .bpk-card .btn{ width:auto; align-self:flex-start; }
 .chip.bo-pro{ background:rgba(37,99,235,.12); }
+.bpk-table td{ vertical-align:middle; } .bpk-table input[type=number]{ width:120px; }
+.bpk-st{ font-size:12px; font-weight:700; white-space:nowrap; } .bpk-st.on{ color:#16a34a; } .bpk-st.off{ color:#dc2626; } .bpk-st.warn{ color:#d97706; }
 

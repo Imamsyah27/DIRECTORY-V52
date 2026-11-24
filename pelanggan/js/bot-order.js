@@ -43,7 +43,7 @@ Object.assign(TRANSLATIONS.en, {
 });
 Object.assign(SERVER_ERROR_MAP, {
     "Harga Bot Order belum diatur admin": "bo_err_price", "Pilih proses pengiriman": "bo_err_proses", "Proses pengiriman tidak valid": "bo_err_proses",
-    "Proses pengiriman ini sedang tidak tersedia": "bo_proses_off", "Maksimal 500 tagar per pesanan": "bo_err_max", "Tagar wajib diisi": "bo_err_tag"
+    "Proses pengiriman ini sedang tidak tersedia": "bo_proses_off", "Pemesanan proses dan jenis ini sedang ditutup": "bo_combo_off", "Maksimal 500 tagar per pesanan": "bo_err_max", "Tagar wajib diisi": "bo_err_tag"
 });
 
 const BO_PKGS = ["BEM", "SEM", "LEM"];
