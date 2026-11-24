@@ -500,3 +500,49 @@ Object.assign(TRANSLATIONS.ar, {
     bk_send: "اطلب",
     bo_pkg_tags: "{pkg}: {n} وسم"
 });
+
+/* Bot Order: proses pengiriman 1F / 2F Request */
+Object.assign(TRANSLATIONS.id, {
+    bo_sub_proses: "Pilih proses pengiriman dan jenis bot, lalu masukkan tagar. 1 pesanan = 1 proses + 1 jenis.",
+    bo_proses_label: "Proses pengiriman",
+    bo_proses_ph: "Pilih proses pengiriman",
+    bo_proses_rules: "Notes / rules",
+    bo_proses_none: "Belum ada proses pengiriman yang tersedia. Hubungi admin.",
+    bo_err_proses: "Pilih proses pengiriman terlebih dahulu",
+    bo_err_pkg: "Pilih jenis bot (BEM / SEM / LEM)",
+    bo_proses_off: "Proses pengiriman ini sedang tidak tersedia",
+    bo_proses_all: "Semua proses"
+});
+Object.assign(TRANSLATIONS.en, {
+    bo_sub_proses: "Choose the delivery process and bot type, then enter your tags. 1 order = 1 process + 1 type.",
+    bo_proses_label: "Delivery process",
+    bo_proses_ph: "Choose a delivery process",
+    bo_proses_rules: "Notes / rules",
+    bo_proses_none: "No delivery process is available yet. Please contact the admin.",
+    bo_err_proses: "Please choose a delivery process first",
+    bo_err_pkg: "Choose a bot type (BEM / SEM / LEM)",
+    bo_proses_off: "This delivery process is currently unavailable",
+    bo_proses_all: "All processes"
+});
+Object.assign(TRANSLATIONS.vi, {
+    bo_sub_proses: "Chọn quy trình gửi và loại bot, rồi nhập thẻ. 1 đơn = 1 quy trình + 1 loại.",
+    bo_proses_label: "Quy trình gửi",
+    bo_proses_ph: "Chọn quy trình gửi",
+    bo_proses_rules: "Ghi chú / quy định",
+    bo_proses_none: "Chưa có quy trình gửi nào. Vui lòng liên hệ admin.",
+    bo_err_proses: "Vui lòng chọn quy trình gửi trước",
+    bo_err_pkg: "Chọn loại bot (BEM / SEM / LEM)",
+    bo_proses_off: "Quy trình gửi này hiện không khả dụng",
+    bo_proses_all: "Tất cả quy trình"
+});
+Object.assign(TRANSLATIONS.ar, {
+    bo_sub_proses: "اختر طريقة التسليم ونوع البوت، ثم أدخل الوسوم. طلب واحد = طريقة واحدة + نوع واحد.",
+    bo_proses_label: "طريقة التسليم",
+    bo_proses_ph: "اختر طريقة التسليم",
+    bo_proses_rules: "ملاحظات / قواعد",
+    bo_proses_none: "لا توجد طريقة تسليم متاحة بعد. تواصل مع المشرف.",
+    bo_err_proses: "اختر طريقة التسليم أولاً",
+    bo_err_pkg: "اختر نوع البوت (BEM / SEM / LEM)",
+    bo_proses_off: "طريقة التسليم هذه غير متاحة حالياً",
+    bo_proses_all: "كل الطرق"
+});

@@ -897,7 +897,7 @@
             </section>
 
             <section class="panel pr-panel">
-                <div class="panel-title">📦 Harga Bot Order <span class="panel-hint">terpisah dari harga harian, per tagar</span></div>
+                <div class="panel-title">📦 Harga Bot Order <span class="panel-hint">harga lama per jenis · Bot Order baru memakai panel "Proses Pengiriman Bot (1F / 2F)"</span></div>
                 <p class="muted-note">Harga jual BEM / SEM / LEM Bot Order per 1 tagar. Dipakai untuk menghitung profit di BSL Profit (tidak mengubah harga harian pelanggan).</p>
                 <div class="pr-grid">
                     <div class="field"><label for="prBBem">BEM Bot / tagar (Rp)</label><input type="number" id="prBBem" min="0" inputmode="numeric"></div>
@@ -918,6 +918,13 @@
                 </tbody></table></div>
                 <label class="pr-check" style="margin-top:10px;"><input type="checkbox" id="prAvBulk"> <span>Bulk Order tersedia (OFF = pelanggan tidak bisa memesan)</span></label>
                 <div style="margin-top:12px;"><button class="btn btn-primary" id="prSaveBulk">💾 Simpan Harga Bulk</button></div>
+            </section>
+
+            <section class="panel pr-panel">
+                <div class="panel-title">📨 Proses Pengiriman Bot (1F / 2F Request) <span class="panel-hint">harga per tagar per kombinasi proses + jenis</span></div>
+                <p class="muted-note">Setiap Bot Order wajib memilih <b>1 proses</b> (1F / 2F) dan <b>1 jenis</b> (BEM / SEM / LEM). Harga Bot Order dihitung dari tabel di bawah
+                    (harga custom per pelanggan: menu <b>Custom Price</b> / <b>Harga Pelanggan</b>, item "Bot Order · Proses"). Notes / rules tampil di form pemesanan pelanggan.</p>
+                <div id="prBotProses"><div class="rn-empty" style="display:block;">Memuat…</div></div>
             </section>
 
             <section class="panel pr-panel">
@@ -972,6 +979,11 @@
                 <p class="muted-note" id="boNote">Saat Anda menekan <b>Setujui</b>, pesanan otomatis dicatat di <b>BSL Profit</b> (omset = total bayar, modal = modal bot × jumlah tagar).</p>
                 <div class="toolbar"><div class="search-wrap"><input type="search" id="boSearch" placeholder="🔍 Cari tagar, nama pelanggan, atau #nomor pesanan…" autocomplete="off" maxlength="60"></div></div>
                 <div class="bo-search-info" id="boSearchInfo" style="display:none;"></div>
+                <div class="hold-tabs bo-pkg" id="boProses">
+                    <button type="button" data-pro="all" class="on">Semua proses <i>0</i></button>
+                    <button type="button" data-pro="1F">1F Request <i>0</i></button>
+                    <button type="button" data-pro="2F">2F Request <i>0</i></button>
+                </div>
                 <div class="hold-tabs bo-pkg" id="boPkg">
                     <button type="button" data-pkg="BEM" class="on">BEM Order <i>0</i></button>
                     <button type="button" data-pkg="SEM">SEM Order <i>0</i></button>
@@ -1502,6 +1514,7 @@
 <script src="js/katalog.js"></script>
 <script src="js/kv-catalog.js"></script>
 <script src="js/price.js"></script>
+<script src="js/bot-proses.js"></script>
 <script src="js/bsl-profit.js"></script>
 <script src="js/usdt.js"></script>
 <script src="js/harga-pelanggan.js"></script>

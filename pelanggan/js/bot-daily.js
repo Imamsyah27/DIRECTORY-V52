@@ -31,7 +31,9 @@ function renderBotDaily() {
     const rows = raw.map(r => BD.pkg === "all" ? r : { tanggal: r.tanggal, tagar: r[k], pesanan: r["p_" + k] });
     const total = rows.reduce((a, r) => a + Number(r.tagar || 0), 0), totalOrd = rows.reduce((a, r) => a + Number(r.pesanan || 0), 0);
     const max = Math.max(1, ...rows.map(r => Number(r.tagar || 0)));
-    const pkgTabs = perPkg ? `<div class="filter-tabs" id="bdPkg">${["all", "BEM", "SEM", "LEM"].map(p => `<button type="button" data-bdp="${p}" class="${BD.pkg === p ? "on" : ""}">${p === "all" ? escapeHtml(t("filter_all")) : p}</button>`).join("")}</div>` : "";
+    const perPro = raw.length > 0 && "1f" in raw[0];                  // migrasi 009 sudah dijalankan
+    if (!perPro && (BD.pkg === "1F" || BD.pkg === "2F")) BD.pkg = "all";
+    const pkgTabs = perPkg ? `<div class="filter-tabs" id="bdPkg">${["all", "BEM", "SEM", "LEM", ...(perPro ? ["1F", "2F"] : [])].map(p => `<button type="button" data-bdp="${p}" class="${BD.pkg === p ? "on" : ""}">${p === "all" ? escapeHtml(t("filter_all")) : p}</button>`).join("")}</div>` : "";
     const day = d => new Date(d + "T00:00:00").toLocaleDateString(loc, { weekday: "short", day: "2-digit", month: "short" });
     let body;
     if (BD.rows === null) body = `<div class="bd-empty">…</div>`;

@@ -192,7 +192,10 @@ function renderPriceList() {
         const tag = x.jenis === "istimewa" ? `<span class="price-tag sp">${escapeHtml(t("price_special"))}</span>` : x.jenis === "diskon" ? `<span class="price-tag ds">${escapeHtml(t("price_discount"))} ${x.persen}%</span>` : "";
         return `<div class="pl-row"><span class="pl-name">${k}</span><span>${price} ${tag} ${off}</span></div>`;
     }).join("");
-    const bot = i.bot ? ["BEM", "SEM", "LEM"].filter(k => i.bot[k] > 0).map(k => `<div class="pl-row"><span class="pl-name">${k} Bot</span><span>${i.bot_normal && i.bot_normal[k] > i.bot[k] ? `<s>${fmtRp(i.bot_normal[k])}</s> ` : ""}<b>${fmtRp(i.bot[k])}</b>${i.bot_normal && i.bot_normal[k] !== i.bot[k] ? ` <span class="price-tag sp">${escapeHtml(t("price_special"))}</span>` : ""}${!pkgAvail(k, true) ? `<span class="price-tag off">${escapeHtml(t("av_off"))}</span>` : ""}</span></div>`).join("") : "";
+    const pros = typeof cuBotPkgs !== "undefined" && Array.isArray(cuBotPkgs) ? cuBotPkgs : null;
+    const botPro = pros && pros.length ? pros.map(k => ["BEM", "SEM", "LEM"].filter(d => Number(k.harga && k.harga[d]) > 0)
+        .map(d => `<div class="pl-row"><span class="pl-name">${escapeHtml(k.nama)} · ${d}</span><span>${Number(k.normal && k.normal[d]) > Number(k.harga[d]) ? `<s>${fmtRp(k.normal[d])}</s> ` : ""}<b>${fmtRp(k.harga[d])}</b></span></div>`).join("")).join("") : "";
+    const bot = botPro ? botPro : i.bot ? ["BEM", "SEM", "LEM"].filter(k => i.bot[k] > 0).map(k => `<div class="pl-row"><span class="pl-name">${k} Bot</span><span>${i.bot_normal && i.bot_normal[k] > i.bot[k] ? `<s>${fmtRp(i.bot_normal[k])}</s> ` : ""}<b>${fmtRp(i.bot[k])}</b>${i.bot_normal && i.bot_normal[k] !== i.bot[k] ? ` <span class="price-tag sp">${escapeHtml(t("price_special"))}</span>` : ""}${!pkgAvail(k, true) ? `<span class="price-tag off">${escapeHtml(t("av_off"))}</span>` : ""}</span></div>`).join("") : "";
     if (!daily && !bot) { box.innerHTML = ""; return; }
     let folded = false; try { folded = localStorage.getItem("cu_price_fold") !== "0"; } catch (e) {}
     box.innerHTML = `<div class="panel pl-panel${folded ? " collapsed" : ""}" id="plPanel">

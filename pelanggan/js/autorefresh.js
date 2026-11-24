@@ -48,7 +48,11 @@
             });
         },
         panel: () => { ssCache.del("panel"); safe(() => typeof loadPanel === "function" && loadPanel(true)); },
-        announce: () => { safe(typeof loadAnnouncements === "function" && loadAnnouncements); }
+        announce: () => { safe(typeof loadAnnouncements === "function" && loadAnnouncements); },
+        botpkg: () => {            // proses 1F / 2F (nama, notes, harga) diubah admin
+            ssCache.del("botpkg");
+            safe(() => typeof ensureBotPkgs === "function" && ensureBotPkgs(true).then(() => { if (typeof renderPriceList === "function") renderPriceList(); if (typeof renderBotOrders === "function") renderBotOrders(); }));
+        }
     };
     // pesanan bot saya masih menunggu dikirim? (nomor batch hanya berubah untuk pesanan yang masih di antrian)
     const hasQueuedBot = () => typeof myBotOrders !== "undefined" && myBotOrders.some(r => r.status === "approved" && !r.dikirim_at && !r.arsip);
@@ -70,6 +74,7 @@
         if (has("supply_batches", "supply_accounts")) { throttled("supply", 60000, L.supply); throttled("catalog", 60000, L.catalog); }
         if (has("catalog_items", "catalog_categories", "farm_batches", "farm_tokens", "hav_batches", "hav_keys", "preorder_items")) throttled("catalog", 60000, L.catalog);
         if (has("price_settings", "price_custom", "price_item", "price_special", "payment_settings", "referral_codes")) { L.price(); throttled("catalog", 0, L.catalog); }
+        if (has("bot_packages", "price_item")) L.botpkg();
         if (has("panel_settings")) L.panel();
         if (has("announcements")) L.announce();
     }

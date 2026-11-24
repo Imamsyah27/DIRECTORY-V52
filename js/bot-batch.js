@@ -4,12 +4,16 @@
  * "Tandai sudah dikirim" = tagar keluar dari batch dan slotnya langsung diisi tagar pending berikutnya (tanpa reload).
  * Tagar terkirim tampil di panel "Sudah dikirim" sampai diarsipkan.
  */
-const BB = { size: 50, pending: 0, archived: 0, entries: [], sent: [], orders: [], pkg: "BEM", loaded: false, bound: false, busy: false,
+const BB = { pro: "1F", size: 50, pending: 0, archived: 0, entries: [], sent: [], orders: [], pkg: "BEM", loaded: false, bound: false, busy: false,
     daily: { days: 7, rows: null, at: 0, loading: false, missing: false } };   // total tagar per hari (bot_daily_admin, migrasi 006)
 const bbPin = () => sessionStorage.getItem("akun_admin_pin");
 const bbNum = n => Number(n || 0).toLocaleString("id-ID");
 const bbRp = n => "Rp " + bbNum(n);
 const bbPkgs = ["BEM", "SEM", "LEM"];
+/* proses pengiriman (migrasi 007/008): batch dihitung per kombinasi jenis + proses. "" = tanpa proses (order lama & Bulk) */
+const bbPros = [["1F", "1F Request"], ["2F", "2F Request"], ["", "Tanpa proses (lama & Bulk)"]];
+const bbIn = (e, pkg = BB.pkg, pro = BB.pro) => e.dashboard === pkg && (e.proses || "") === pro;
+const bbCombo = (pkg = BB.pkg, pro = BB.pro) => (pro ? pro + " · " : "") + pkg;
 
 async function bbRpc(name, params) {
     let res;
@@ -50,18 +54,19 @@ function bbDailyHtml() {
     const d = BB.daily; if (d.missing) return "";
     const rows = d.rows || [], tot = k => rows.reduce((a, r) => a + Number(r[k] || 0), 0);
     const day = iso => new Date(iso + "T00:00:00").toLocaleDateString("id-ID", { weekday: "short", day: "2-digit", month: "short" });
-    const cell = (r, k) => `<td class="num${BB.pkg.toLowerCase() === k ? " bb-cur" : ""}">${bbNum(r[k])}</td>`;
-    return `<section class="panel table-section"><div class="panel-title">📊 Total Tagar per Hari <span class="panel-hint">semua pelanggan · tanggal pesan (WIB) · ditolak / dibatalkan tidak dihitung · tagar Bulk dihitung ke jenisnya</span></div>
+    const cell = (r, k) => `<td class="num${BB.pkg.toLowerCase() === k || BB.pro.toLowerCase() === k ? " bb-cur" : ""}">${bbNum(r[k])}</td>`;
+    const hasPro = rows.length > 0 && "1f" in rows[0];          // migrasi 009 sudah dijalankan
+    return `<section class="panel table-section"><div class="panel-title">📊 Total Tagar per Hari <span class="panel-hint">semua pelanggan · tanggal pesan (WIB) · ditolak / dibatalkan tidak dihitung · tagar Bulk dihitung ke jenisnya · 1F / 2F = tagar per proses</span></div>
         <div class="hold-tabs">${[7, 14, 30].map(n => `<button type="button" data-bbdays="${n}" class="${d.days === n ? "on" : ""}" ${d.loading ? "disabled" : ""}>${n} hari</button>`).join("")}</div>
-        ${d.rows === null ? `<div class="rn-empty" style="display:block;">Memuat…</div>` : `<div class="table-wrap"><table style="min-width:520px;"><thead><tr><th>Tanggal</th><th class="num">BEM</th><th class="num">SEM</th><th class="num">LEM</th><th class="num">Total tagar</th><th class="num">Pesanan</th></tr></thead><tbody>
-            ${rows.map(r => `<tr class="${Number(r.bem) + Number(r.sem) + Number(r.lem) ? "" : "bb-zero"}"><td>${day(r.tanggal)}</td>${cell(r, "bem")}${cell(r, "sem")}${cell(r, "lem")}<td class="num"><b>${bbNum(Number(r.bem) + Number(r.sem) + Number(r.lem))}</b></td><td class="num">${bbNum(r.pesanan)}</td></tr>`).join("")}
-            <tr class="bb-total"><td><b>Total ${d.days} hari</b></td><td class="num"><b>${bbNum(tot("bem"))}</b></td><td class="num"><b>${bbNum(tot("sem"))}</b></td><td class="num"><b>${bbNum(tot("lem"))}</b></td><td class="num"><b>${bbNum(tot("bem") + tot("sem") + tot("lem"))}</b></td><td class="num"><b>${bbNum(tot("pesanan"))}</b></td></tr>
+        ${d.rows === null ? `<div class="rn-empty" style="display:block;">Memuat…</div>` : `<div class="table-wrap"><table style="min-width:520px;"><thead><tr><th>Tanggal</th><th class="num">BEM</th><th class="num">SEM</th><th class="num">LEM</th>${hasPro ? `<th class="num">1F</th><th class="num">2F</th>` : ""}<th class="num">Total tagar</th><th class="num">Pesanan</th></tr></thead><tbody>
+            ${rows.map(r => `<tr class="${Number(r.bem) + Number(r.sem) + Number(r.lem) ? "" : "bb-zero"}"><td>${day(r.tanggal)}</td>${cell(r, "bem")}${cell(r, "sem")}${cell(r, "lem")}${hasPro ? cell(r, "1f") + cell(r, "2f") : ""}<td class="num"><b>${bbNum(Number(r.bem) + Number(r.sem) + Number(r.lem))}</b></td><td class="num">${bbNum(r.pesanan)}</td></tr>`).join("")}
+            <tr class="bb-total"><td><b>Total ${d.days} hari</b></td><td class="num"><b>${bbNum(tot("bem"))}</b></td><td class="num"><b>${bbNum(tot("sem"))}</b></td><td class="num"><b>${bbNum(tot("lem"))}</b></td>${hasPro ? `<td class="num"><b>${bbNum(tot("1f"))}</b></td><td class="num"><b>${bbNum(tot("2f"))}</b></td>` : ""}<td class="num"><b>${bbNum(tot("bem") + tot("sem") + tot("lem"))}</b></td><td class="num"><b>${bbNum(tot("pesanan"))}</b></td></tr>
         </tbody></table></div>`}
     </section>`;
 }
 /* batch dihitung dari tagar PENDING saja: posisi ke-1..size = Batch 1, dst. */
-const bbBatches = pkg => {
-    const list = BB.entries.filter(e => e.dashboard === pkg).sort((a, b) => a.id - b.id), out = [];
+const bbBatches = (pkg, pro = BB.pro) => {
+    const list = BB.entries.filter(e => bbIn(e, pkg, pro)).sort((a, b) => a.id - b.id), out = [];
     for (let i = 0; i < list.length; i += BB.size) out.push([out.length + 1, list.slice(i, i + BB.size)]);
     return out;
 };
@@ -69,10 +74,10 @@ const bbTags = list => list.map(e => e.tagar).join("\n");
 
 function bbRender() {
     const pane = document.getElementById("ordPane-batch");
-    const all = BB.entries, pkgCount = p => all.filter(e => e.dashboard === p).length;
-    const batches = bbBatches(BB.pkg), sentPkg = BB.sent.filter(e => e.dashboard === BB.pkg);
+    const all = BB.entries, pkgCount = p => all.filter(e => bbIn(e, p)).length, proCount = pr => all.filter(e => (e.proses || "") === pr).length;
+    const batches = bbBatches(BB.pkg), sentPkg = BB.sent.filter(e => bbIn(e)), sentDash = BB.sent.filter(e => e.dashboard === BB.pkg).length, combo = bbCombo();
     pane.innerHTML = `
-    <section class="panel table-section"><div class="panel-title">📋 Batch Tagar Bot <span class="panel-hint">hanya tagar yang BELUM dikirim · batch dihitung terpisah per jenis BEM / SEM / LEM (tagar Bulk masuk ke jenisnya) · urutan = urutan di-ACC</span></div>
+    <section class="panel table-section"><div class="panel-title">📋 Batch Tagar Bot <span class="panel-hint">hanya tagar yang BELUM dikirim · batch dihitung terpisah per proses (1F / 2F) + jenis (BEM / SEM / LEM) · order lama & tagar Bulk ada di "Tanpa proses" · urutan = urutan di-ACC</span></div>
         <div class="bb-stats">
             <div><span>Belum terkirim</span><b>${bbNum(all.length)}</b></div>
             <div><span>Sudah dikirim (belum diarsip)</span><b>${bbNum(BB.sent.length)}</b></div>
@@ -86,25 +91,26 @@ function bbRender() {
             <button type="button" class="btn btn-success" data-bbcopy="unsent-all" ${all.length ? "" : "disabled"}>📋 Salin semua belum terkirim (${bbNum(all.length)})</button>
             <button type="button" class="btn btn-ghost" id="bbZip" ${all.length ? "" : "disabled"}>⬇ Download ZIP batch</button>
         </div>
+        <div class="hold-tabs bb-pkg">${bbPros.map(([pr, nm]) => `<button type="button" data-bbpro="${pr}" class="${BB.pro === pr ? "on" : ""}">${nm} <i>${bbNum(proCount(pr))}</i></button>`).join("")}</div>
         <div class="hold-tabs bb-pkg">${bbPkgs.map(p => `<button type="button" data-bbpkg="${p}" class="${BB.pkg === p ? "on" : ""}">${p} <i>${bbNum(pkgCount(p))}</i></button>`).join("")}</div>
-        <div class="bb-pkgtools"><button type="button" class="btn btn-ghost mini" data-bbcopy="unsent-pkg" ${pkgCount(BB.pkg) ? "" : "disabled"}>📋 Salin ${BB.pkg} belum terkirim (${bbNum(pkgCount(BB.pkg))})</button></div>
-        <div class="bb-grid">${batches.length ? batches.map(([no, list]) => bbCardHtml(BB.pkg, no, list)).join("") : `<div class="rn-empty" style="display:block;">Tidak ada tagar ${BB.pkg} yang menunggu dikirim. Tagar masuk setelah pesanan di-ACC.</div>`}</div>
+        <div class="bb-pkgtools"><button type="button" class="btn btn-ghost mini" data-bbcopy="unsent-pkg" ${pkgCount(BB.pkg) ? "" : "disabled"}>📋 Salin ${combo} belum terkirim (${bbNum(pkgCount(BB.pkg))})</button></div>
+        <div class="bb-grid">${batches.length ? batches.map(([no, list]) => bbCardHtml(BB.pkg, no, list, BB.pro)).join("") : `<div class="rn-empty" style="display:block;">Tidak ada tagar ${combo} yang menunggu dikirim. Tagar masuk setelah pesanan di-ACC.</div>`}</div>
     </section>
-    <section class="panel table-section"><div class="panel-title">✅ Sudah dikirim ${BB.pkg} <span class="panel-hint">belum diarsip — sudah keluar dari batch</span></div>
+    <section class="panel table-section"><div class="panel-title">✅ Sudah dikirim ${combo} <span class="panel-hint">belum diarsip — sudah keluar dari batch</span></div>
         <div class="bb-pkgtools">
-            <button type="button" class="btn btn-primary mini" data-bbarchive="pkg" ${sentPkg.length ? "" : "disabled"}>📦 Arsipkan ${BB.pkg} terkirim (${bbNum(sentPkg.length)})</button>
+            <button type="button" class="btn btn-primary mini" data-bbarchive="pkg" ${sentDash ? "" : "disabled"}>📦 Arsipkan ${BB.pkg} terkirim, semua proses (${bbNum(sentDash)})</button>
             <button type="button" class="btn btn-ghost mini" data-bbarchive="all" ${BB.sent.length ? "" : "disabled"}>📦 Arsipkan semua paket (${bbNum(BB.sent.length)})</button>
             <button type="button" class="btn btn-ghost mini" data-bbcopy="sent-pkg" ${sentPkg.length ? "" : "disabled"}>📋 Salin</button>
         </div>
-        ${sentPkg.length ? `<details data-bbdet="sent:${BB.pkg}" ${bbCardHtml.open && bbCardHtml.open.has("sent:" + BB.pkg) ? "open" : ""}><summary>Lihat ${bbNum(sentPkg.length)} tagar terkirim</summary>
+        ${sentPkg.length ? `<details data-bbdet="sent:${combo}" ${bbCardHtml.open && bbCardHtml.open.has("sent:" + combo) ? "open" : ""}><summary>Lihat ${bbNum(sentPkg.length)} tagar terkirim</summary>
             <ol class="bb-list">${sentPkg.map(e => `<li class="sent"><button type="button" class="copy-chip" data-copy="${escapeHtml(e.tagar)}" title="Klik untuk menyalin">${escapeHtml(e.tagar)}</button> <small>${escapeHtml(e.username)} · ${bbWaktu(e.sent_at)}</small>
                 <button type="button" class="btn btn-ghost mini" data-bbundo="${e.id}" title="Kembalikan ke batch (belum dikirim)">↩</button></li>`).join("")}</ol></details>`
-            : `<div class="rn-empty" style="display:block;">Belum ada tagar ${BB.pkg} terkirim yang menunggu diarsip.</div>`}
+            : `<div class="rn-empty" style="display:block;">Belum ada tagar ${combo} terkirim yang menunggu diarsip.</div>`}
     </section>
     <section class="panel table-section"><div class="panel-title">🧾 Pesanan Aktif <span class="panel-hint">sudah di-ACC & belum selesai dikirim</span></div>
         <div class="table-wrap"><table style="min-width:720px;"><thead><tr><th>Pesanan</th><th>Pelanggan</th><th>Paket</th><th>Tagar</th><th>Terkirim</th><th>Aksi</th></tr></thead><tbody>
         ${BB.orders.map(o => `<tr><td>#${o.id}<br><small>${bbWaktu(o.processed_at)}</small></td><td><b>${escapeHtml(o.username)}</b></td>
-            <td>${o.dashboard === "BULK" ? "🧺 BULK" : escapeHtml(o.dashboard) + " Bot"}</td><td>${bbNum(o.n_total)}</td>
+            <td>${o.dashboard === "BULK" ? "🧺 BULK" : escapeHtml(o.dashboard) + " Bot" + (o.proses ? " · " + escapeHtml(o.proses) : "")}</td><td>${bbNum(o.n_total)}</td>
             <td>${o.n_sent ? `<span class="badge badge-warn">⏳ ${bbNum(o.n_sent)}/${bbNum(o.n_total)}</span>` : "—"}<br><small>${bbRp(o.total_harga)}</small></td>
             <td>${o.n_sent ? `<small>sebagian sudah dikirim — tidak bisa dibatalkan</small>` : `<button type="button" class="btn btn-danger mini" data-bbcancel="${o.id}">✖ Batalkan & kembalikan koin</button>`}</td></tr>`).join("")}
         </tbody></table></div>
@@ -115,14 +121,14 @@ function bbRender() {
 }
 const bbWaktu = iso => iso ? new Date(iso).toLocaleString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "-";
 
-function bbCardHtml(pkg, no, list) {
-    const open = bbCardHtml.open && bbCardHtml.open.has(pkg + ":" + no + ":" + list[0].id);
+function bbCardHtml(pkg, no, list, pro = "") {
+    const open = bbCardHtml.open && bbCardHtml.open.has(pro + ":" + pkg + ":" + no + ":" + list[0].id);
     return `<div class="bb-card">
-        <div class="bb-card-head"><b>Batch ${no}</b><span>${bbNum(list.length)} tagar${list.length < BB.size ? ` <small>(isi ${list.length}/${BB.size})</small>` : ""}</span></div>
+        <div class="bb-card-head"><b>${pro ? escapeHtml(pro) + " · " : ""}${pkg} · Batch ${no}</b><span>${bbNum(list.length)} tagar${list.length < BB.size ? ` <small>(isi ${list.length}/${BB.size})</small>` : ""}</span></div>
         <div class="bb-card-state">⏳ Belum dikirim</div>
-        <button type="button" class="btn btn-success btn-block bb-mark" data-bbmark="${pkg}:${no}" ${BB.busy ? "disabled" : ""}>✅ Tandai sudah dikirim</button>
-        <div class="bb-card-actions"><button type="button" class="btn btn-ghost mini" data-bbcopy="batch" data-pkg="${pkg}" data-no="${no}">📋 Salin batch</button></div>
-        <details ${open ? "open" : ""} data-bbdet="${pkg}:${no}:${list[0].id}"><summary>Lihat tagar</summary>
+        <button type="button" class="btn btn-success btn-block bb-mark" data-bbmark="${pkg}:${no}" data-pro="${pro}" ${BB.busy ? "disabled" : ""}>✅ Tandai sudah dikirim</button>
+        <div class="bb-card-actions"><button type="button" class="btn btn-ghost mini" data-bbcopy="batch" data-pkg="${pkg}" data-pro="${pro}" data-no="${no}">📋 Salin batch</button></div>
+        <details ${open ? "open" : ""} data-bbdet="${pro}:${pkg}:${no}:${list[0].id}"><summary>Lihat tagar</summary>
             <ol class="bb-list">${list.map(e => `<li><button type="button" class="copy-chip" data-copy="${escapeHtml(e.tagar)}" title="Klik untuk menyalin">${escapeHtml(e.tagar)}</button> <small>${escapeHtml(e.username)}</small></li>`).join("")}</ol></details>
     </div>`;
 }
@@ -134,6 +140,7 @@ async function bbCopy(text, label) {
 }
 async function bbOnClick(e) {
     const pk = e.target.closest("[data-bbpkg]"); if (pk) { BB.pkg = pk.dataset.bbpkg; bbRender(); return; }
+    const pr = e.target.closest("[data-bbpro]"); if (pr) { BB.pro = pr.dataset.bbpro; bbRender(); return; }
     const dd = e.target.closest("[data-bbdays]"); if (dd) { if (!BB.daily.loading) { BB.daily.days = Number(dd.dataset.bbdays); bbLoadDaily(); } return; }
     const det = e.target.closest("details[data-bbdet]");
     if (det && e.target.closest("summary")) { bbCardHtml.open = bbCardHtml.open || new Set(); const k = det.dataset.bbdet; setTimeout(() => { if (det.open) bbCardHtml.open.add(k); else bbCardHtml.open.delete(k); }, 0); return; }
@@ -141,9 +148,9 @@ async function bbOnClick(e) {
     if (c) {
         const k = c.dataset.bbcopy, all = BB.entries;
         if (k === "unsent-all") bbCopy(bbTags(all), `${bbNum(all.length)} tagar`);
-        else if (k === "unsent-pkg") { const l = all.filter(x => x.dashboard === BB.pkg); bbCopy(bbTags(l), `${bbNum(l.length)} tagar ${BB.pkg}`); }
-        else if (k === "sent-pkg") { const l = BB.sent.filter(x => x.dashboard === BB.pkg); bbCopy(bbTags(l), `${bbNum(l.length)} tagar terkirim ${BB.pkg}`); }
-        else if (k === "batch") { const b = bbBatches(c.dataset.pkg).find(([no]) => no === Number(c.dataset.no)); if (b) bbCopy(bbTags(b[1]), `Batch ${c.dataset.no} (${bbNum(b[1].length)} tagar)`); }
+        else if (k === "unsent-pkg") { const l = all.filter(x => bbIn(x)); bbCopy(bbTags(l), `${bbNum(l.length)} tagar ${bbCombo()}`); }
+        else if (k === "sent-pkg") { const l = BB.sent.filter(x => bbIn(x)); bbCopy(bbTags(l), `${bbNum(l.length)} tagar terkirim ${bbCombo()}`); }
+        else if (k === "batch") { const b = bbBatches(c.dataset.pkg, c.dataset.pro || "").find(([no]) => no === Number(c.dataset.no)); if (b) bbCopy(bbTags(b[1]), `Batch ${c.dataset.no} (${bbNum(b[1].length)} tagar)`); }
         return;
     }
     const mk = e.target.closest("[data-bbmark]"); if (mk) { bbMarkBatch(mk); return; }
@@ -166,7 +173,7 @@ function bbApplyLocal(ids, toSent) {
 }
 async function bbMarkBatch(btn) {
     if (BB.busy) return;
-    const [pkg, no] = btn.dataset.bbmark.split(":"), b = bbBatches(pkg).find(([n]) => n === Number(no));
+    const [pkg, no] = btn.dataset.bbmark.split(":"), pro = btn.dataset.pro || "", b = bbBatches(pkg, pro).find(([n]) => n === Number(no));
     if (!b) return;
     const ids = b[1].map(x => x.id);
     BB.busy = true; btn.disabled = true; btn.textContent = "Menyimpan…";
@@ -178,7 +185,7 @@ async function bbMarkBatch(btn) {
         bbInit(); return;
     }
     bbApplyLocal(ids, true); bbRender();
-    showToast(`Batch ${no} ${pkg} (${bbNum(ids.length)} tagar) ditandai terkirim`, "success");
+    showToast(`Batch ${no} ${bbCombo(pkg, pro)} (${bbNum(ids.length)} tagar) ditandai terkirim`, "success");
 }
 async function bbUndo(id, btn) {
     if (BB.busy) return;
@@ -248,9 +255,9 @@ function bbZip(files) {
 }
 function bbDownloadZip() {
     const files = [];
-    bbPkgs.forEach(p => bbBatches(p).forEach(([no, list]) => files.push({ name: `${p}/batch-${String(no).padStart(3, "0")}.txt`, text: bbTags(list) + "\n" })));
+    bbPros.forEach(([pr]) => bbPkgs.forEach(p => bbBatches(p, pr).forEach(([no, list]) => files.push({ name: `${pr || "tanpa-proses"}/${p}/batch-${String(no).padStart(3, "0")}.txt`, text: bbTags(list) + "\n" }))));
     if (!files.length) { showToast("Tidak ada tagar untuk diunduh", "danger"); return; }
-    const sum = bbPkgs.map(p => `${p}: ${bbBatches(p).length} batch, ${BB.entries.filter(e => e.dashboard === p).length} tagar belum terkirim`).join("\n");
+    const sum = bbPros.flatMap(([pr, nm]) => bbPkgs.map(p => `${nm} · ${p}: ${bbBatches(p, pr).length} batch, ${BB.entries.filter(e => bbIn(e, p, pr)).length} tagar belum terkirim`)).join("\n");
     files.push({ name: "ringkasan.txt", text: `Isi per batch: ${BB.size}\nDibuat: ${new Date().toLocaleString("id-ID")}\nHanya tagar yang belum terkirim\n${sum}\n` });
     const url = URL.createObjectURL(bbZip(files)), a = document.createElement("a");
     a.href = url; a.download = `batch-tagar-${new Date().toISOString().slice(0, 10)}.zip`; document.body.appendChild(a); a.click(); a.remove();

@@ -42,20 +42,47 @@ Object.assign(TRANSLATIONS.en, {
     bo_tags_view: "View tag list", bo_tags_loading: "Loading tag list…", bo_tags_copy: "Copy all tags", bo_tags_copied_toast: "Tag list copied", bo_tags_err: "Failed to load the tag list"
 });
 Object.assign(SERVER_ERROR_MAP, {
-    "Harga Bot Order belum diatur admin": "bo_err_price", "Maksimal 500 tagar per pesanan": "bo_err_max", "Tagar wajib diisi": "bo_err_tag"
+    "Harga Bot Order belum diatur admin": "bo_err_price", "Pilih proses pengiriman": "bo_err_proses", "Proses pengiriman tidak valid": "bo_err_proses",
+    "Proses pengiriman ini sedang tidak tersedia": "bo_proses_off", "Maksimal 500 tagar per pesanan": "bo_err_max", "Tagar wajib diisi": "bo_err_tag"
 });
 
 const BO_PKGS = ["BEM", "SEM", "LEM"];
-const boPrice = (pkg) => Number((cuPriceInfo && cuPriceInfo.bot && cuPriceInfo.bot[pkg]) || 0);
+
+/* ---------------- Proses pengiriman 1F / 2F Request (migrasi 007) ----------------
+ * Pengaturan proses (nama, notes/rules, harga per jenis untuk pelanggan ini) di-cache 10 menit di sessionStorage;
+ * cache dihapus otomatis saat admin mengubahnya (autorefresh.js, tabel bot_packages / price_item). */
+let cuBotPkgs = null, cuBotPkgsMissing = false, _botPkgLoading = null;
+function ensureBotPkgs(force) {
+    if (cuBotPkgs && !force) return Promise.resolve(cuBotPkgs);
+    const hit = force ? null : ssCache.get("botpkg"); if (hit) { cuBotPkgs = hit; return Promise.resolve(cuBotPkgs); }
+    if (!_botPkgLoading) _botPkgLoading = cuRpc("cu_bot_packages").then(({ data, error }) => {
+        _botPkgLoading = null;
+        if (error) { cuBotPkgsMissing = /does not exist|schema cache|Could not find the function/i.test(error.message || ""); return cuBotPkgs || []; }
+        cuBotPkgs = data || []; ssCache.set("botpkg", cuBotPkgs, 10 * 60000); return cuBotPkgs;
+    });
+    return _botPkgLoading;
+}
+const botPkgOf = pro => (cuBotPkgs || []).find(k => k.proses === pro) || null;
+const botProName = pro => (botPkgOf(pro) && botPkgOf(pro).nama) || (pro ? pro + " Request" : "");
+/** harga per tagar untuk kombinasi proses + jenis (sudah termasuk harga custom pelanggan; dihitung ulang di server) */
+const boPrice = (pro, pkg) => { const k = botPkgOf(pro); return Number(k && k.harga && k.harga[pkg]) || 0; };
+const boNormal = (pro, pkg) => { const k = botPkgOf(pro); return Number(k && k.normal && k.normal[pkg]) || 0; };
 
 async function openBotOrderModal() {
-    cuPriceInfo = null; await ensurePriceInfo();      // harga terbaru
-    const st = { pkg: BO_PKGS.find(p => boPrice(p) > 0 && pkgAvail(p, true)) || BO_PKGS.find(p => boPrice(p) > 0) || "BEM" };
+    cuPriceInfo = null;
+    await Promise.all([ensurePriceInfo(), ensureBotPkgs()]);     // ketersediaan BEM/SEM/LEM + proses (cache)
+    const pkgs = cuBotPkgs || [];
+    const st = { pro: "", pkg: "" };       // 1 pesanan = 1 proses + 1 jenis
     $("modalBox").innerHTML = `
         <div class="rn-head"><div class="rn-icon">🤖</div>
-            <div><div class="modal-title" style="margin:0">${escapeHtml(t("bo_title"))}</div><div class="rn-sub">${escapeHtml(t("bo_sub"))}</div></div></div>
+            <div><div class="modal-title" style="margin:0">${escapeHtml(t("bo_title"))}</div><div class="rn-sub">${escapeHtml(t("bo_sub_proses"))}</div></div></div>
+        <div class="rn-block"><label class="rn-label" for="boProses">${escapeHtml(t("bo_proses_label"))}</label>
+            ${pkgs.length ? `<select id="boProses" class="bo-proses-select"><option value="" selected disabled>${escapeHtml(t("bo_proses_ph"))}</option>
+                ${pkgs.map(k => `<option value="${escapeHtml(k.proses)}">${escapeHtml(k.nama)}</option>`).join("")}</select>`
+                : `<div class="price-none">${escapeHtml(t(cuBotPkgsMissing ? "rn_err_not_ready" : "bo_proses_none"))}</div>`}
+            <div class="bo-rules" id="boRules" style="display:none;"></div></div>
         <div class="rn-block"><div class="rn-label">${escapeHtml(t("bo_pkg"))}</div>
-            <div class="rn-pkgs" id="boPkgs">${BO_PKGS.map(p => `<button type="button" class="rn-pkg" data-pkg="${p}"><b>${p} Bot</b><small class="rn-pkg-price">${boPrice(p) ? "<b>" + fmtRp(boPrice(p)) + "</b>" + escapeHtml(t("bo_per_tag")) : "-"}</small></button>`).join("")}</div></div>
+            <div class="rn-pkgs" id="boPkgs">${BO_PKGS.map(p => `<button type="button" class="rn-pkg" data-pkg="${p}"><b>${p} Bot</b><small class="rn-pkg-price" id="boPP_${p}">-</small></button>`).join("")}</div></div>
         <div class="rn-block"><label class="rn-label" for="boTags">${escapeHtml(t("bo_tags_label"))} <span class="no-count" id="boCount"></span></label>
             <textarea id="boTags" class="no-area" rows="5" placeholder="${escapeHtml(t("bo_tag_ph"))}" autocomplete="off"></textarea>
             <div class="rn-hint">${escapeHtml(t("bo_tags_hint"))}</div></div>
@@ -66,41 +93,59 @@ async function openBotOrderModal() {
     $("modalOverlay").classList.add("show");
 
     const sync = () => {
-        $("boPkgs").querySelectorAll(".rn-pkg").forEach(c => c.classList.toggle("on", c.dataset.pkg === st.pkg));
-        const n = parseTags($("boTags").value).length, p = boPrice(st.pkg);
+        const k = botPkgOf(st.pro);
+        // notes / rules dari admin untuk proses yang dipilih
+        $("boRules").style.display = k && k.notes ? "block" : "none";
+        $("boRules").innerHTML = k && k.notes ? `<div class="bo-rules-title">📋 ${escapeHtml(t("bo_proses_rules"))} · ${escapeHtml(k.nama)}</div><div class="bo-rules-body">${linkify(k.notes)}</div>` : "";
+        // tombol BEM / SEM / LEM: harga kombinasi; jenis tanpa harga / tidak tersedia tidak bisa dipilih
+        BO_PKGS.forEach(p => {
+            const btn = $("boPkgs").querySelector(`[data-pkg="${p}"]`), pr = boPrice(st.pro, p), nm = boNormal(st.pro, p);
+            const ok = !!st.pro && pr > 0 && pkgAvail(p, true);
+            btn.disabled = !ok; btn.classList.toggle("on", ok && st.pkg === p);
+            $("boPP_" + p).innerHTML = !st.pro ? "-" : pr > 0 ? (nm > pr ? `<s>${fmtRp(nm)}</s> ` : "") + "<b>" + fmtRp(pr) + "</b>" + escapeHtml(t("bo_per_tag")) : escapeHtml(t("av_off"));
+        });
+        if (st.pkg && !(boPrice(st.pro, st.pkg) > 0 && pkgAvail(st.pkg, true))) st.pkg = "";
+        const n = parseTags($("boTags").value).length, p = st.pro && st.pkg ? boPrice(st.pro, st.pkg) : 0;
         $("boCount").textContent = n ? "· " + t("bo_tags_n", { n }) : "";
-        $("boPriceLines").innerHTML = !p ? `<div class="price-none">${escapeHtml(t("bo_unset"))}</div>`
-            : `<div class="price-row sub"><span>${escapeHtml(t("bo_calc", { n: n || 0, p: fmtRp(p) }))}</span><span>${fmtRp(p * n)}</span></div>
+        $("boPriceLines").innerHTML = !st.pro ? `<div class="price-none">${escapeHtml(t("bo_err_proses"))}</div>`
+            : !st.pkg ? `<div class="price-none">${escapeHtml(t("bo_err_pkg"))}</div>`
+            : `<div class="price-row sub"><span>${escapeHtml(botProName(st.pro))} · ${st.pkg} — ${escapeHtml(t("bo_calc", { n: n || 0, p: fmtRp(p) }))}</span><span>${fmtRp(p * n)}</span></div>
                <div class="price-row total"><span>${escapeHtml(t("bo_total"))}</span><b>${fmtRp(p * n)}</b></div>${priceExtraHtml(p * n)}`;
+        $("boYes").disabled = !(st.pro && st.pkg);
     };
-    markPkgAvail($("boPkgs"), true);
+    if ($("boProses")) $("boProses").addEventListener("change", e => { st.pro = e.target.value; sync(); });
     $("boPkgs").addEventListener("click", e => { const c = e.target.closest(".rn-pkg"); if (c && !c.disabled) { st.pkg = c.dataset.pkg; sync(); } });
     $("boTags").addEventListener("input", sync);
     $("boNo").addEventListener("click", closeModal);
     sync();
 
     $("boYes").addEventListener("click", async () => {
-        const tags = parseTags($("boTags").value), note = $("boNote").value.trim(), p = boPrice(st.pkg);
+        const tags = parseTags($("boTags").value), note = $("boNote").value.trim();
+        if (!st.pro) { showToast(t("bo_err_proses"), "danger"); return; }
+        if (!st.pkg) { showToast(t("bo_err_pkg"), "danger"); return; }
+        const p = boPrice(st.pro, st.pkg);
         if (!p) { showToast(t("bo_err_price"), "danger"); return; }
         if (!pkgAvail(st.pkg, true)) { showToast(t("av_err_bot"), "danger"); return; }
         if (!tags.length) { showToast(t("bo_err_tag"), "danger"); $("boTags").focus(); return; }
         if (tags.length > 500) { showToast(t("bo_err_max"), "danger"); return; }
-        const total = p * tags.length;
+        const total = p * tags.length, label = st.pkg + " Bot · " + botProName(st.pro);
 
         if (!(await coinConfirm({ pkg: st.pkg, jumlah: tags.length, total,
-            waText: (tot) => t("bo_wa_text", { pkg: st.pkg + " Bot", n: tags.length, total: tot }) }))) return;
+            lines: [[t("bo_proses_label"), botProName(st.pro)], [t("bo_pkg"), st.pkg + " Bot"], [t("bo_tags_label"), t("bo_tags_n", { n: tags.length })]],
+            waText: (tot) => t("bo_wa_text", { pkg: label, n: tags.length, total: tot }) }))) return;
 
         const btn = $("boYes"); btn.disabled = true; btn.textContent = t("bo_sending");
-        const { data, error } = await cuRpc("cu_request_bot_order", { p_dashboard: st.pkg, p_tagar_list: tags, p_catatan: note || null });
+        const { data, error } = await cuRpc("cu_request_bot_order", { p_dashboard: st.pkg, p_proses: st.pro, p_tagar_list: tags, p_catatan: note || null });
         if (error) {
             btn.disabled = false; btn.textContent = t("bo_send");
             const m = error.message || "";
             showToast(/does not exist|schema cache|Could not find the function/i.test(m) ? t("rn_err_not_ready") : (translateServerError(m) || t("rn_err_generic")), "danger");
+            if (/Proses pengiriman|Harga Bot Order/.test(m)) { ssCache.del("botpkg"); ensureBotPkgs(true).then(sync); }      // pengaturan berubah: ambil ulang
             return;
         }
         loadBotOrders(); if (typeof loadCoin === "function") loadCoin();
         $("modalBox").innerHTML = `<div class="modal-icon success">🤖</div><div class="modal-title">${escapeHtml(t("bo_sent_title"))}</div>
-            <div class="modal-sub">${escapeHtml(t("bo_sent_text", { n: data.jumlah, pkg: st.pkg + " Bot", total: fmtRp(data.total) }))}</div>
+            <div class="modal-sub">${escapeHtml(t("bo_sent_text", { n: data.jumlah, pkg: label, total: fmtRp(data.total) }))}</div>
             <div class="modal-actions"><button type="button" class="btn btn-primary" id="boDone">${escapeHtml(t("bo_close"))}</button></div>`;
         $("boDone").addEventListener("click", closeModal);
     });
@@ -108,7 +153,9 @@ async function openBotOrderModal() {
 
 /* ---------------- Daftar bot order pelanggan (tab "Bot Order") ---------------- */
 let myBotOrders = [], botFilter = "aktif", botKind = "all";   // botKind: all | bot | bulk (dipisah supaya tidak tertukar)
-let botPkg = "all";            // jenis: all | BEM | SEM | LEM (pesanan Bulk tampil di setiap jenis yang ada tagarnya)
+let botPkg = "all";
+let botPro = "all";            // proses pengiriman: all | 1F | 2F (Bulk & order lama tidak punya proses)
+const botProOk = (r, p = botPro) => p === "all" || r.proses === p;            // jenis: all | BEM | SEM | LEM (pesanan Bulk tampil di setiap jenis yang ada tagarnya)
 /* pencarian tagar MILIK SENDIRI: semua tagar diambil 1x saat mulai mencari (cu_my_bot_tags_all), lalu disaring di browser */
 let botQ = "", botAllTags = null, botAllTagsSig = null, botTagsLoading = null, botSearchTimer = null;
 const botNorm = v => String(v || "").trim().replace(/^#+/, "").toLowerCase();
@@ -139,8 +186,9 @@ function botBatchHtml(r) {
     return `<div class="bo-batches">` + bi.batches.map(x => {
         const done = x.sent >= x.n, part = x.sent > 0 && !done;
         // batch = null -> tagar yang sudah terkirim (sudah keluar dari antrian batch)
-        if (x.batch == null) return `<span class="bo-bchip done">${escapeHtml(x.dashboard)}: ${escapeHtml(t("bo_tags_n", { n: x.n }))} ✅</span>`;
-        return `<span class="bo-bchip ${done ? "done" : part ? "part" : ""}">${escapeHtml(x.dashboard)} · ${escapeHtml(t("bb_batch"))} ${x.batch}: ${escapeHtml(t("bo_tags_n", { n: x.n }))} ${done ? "✅" : part ? "⏳ " + x.sent + "/" + x.n : "⏳"}</span>`;
+        const nm = escapeHtml(x.dashboard) + (x.proses ? " · " + escapeHtml(x.proses) : "");
+        if (x.batch == null) return `<span class="bo-bchip done">${nm}: ${escapeHtml(t("bo_tags_n", { n: x.n }))} ✅</span>`;
+        return `<span class="bo-bchip ${done ? "done" : part ? "part" : ""}">${nm} · ${escapeHtml(t("bb_batch"))} ${x.batch}: ${escapeHtml(t("bo_tags_n", { n: x.n }))} ${done ? "✅" : part ? "⏳ " + x.sent + "/" + x.n : "⏳"}</span>`;
     }).join("") + `</div>`;
 }
 function renderBotOrders() {
@@ -149,23 +197,24 @@ function renderBotOrders() {
     const fmt = (iso, withTime) => new Date(iso).toLocaleString(loc, withTime ? { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" } : { day: "2-digit", month: "short" });
     const kindOk = r => botKind === "all" || (botKind === "bulk") === (r.dashboard === "BULK");
     document.querySelectorAll("#botKind button").forEach(b => b.classList.toggle("on", b.dataset.bk === botKind));
-    const match = (r, f) => kindOk(r) && botPkgOk(r) && (f === "all" ? true : f === "arsip" ? !!r.arsip : !r.arsip);
+    const match = (r, f) => kindOk(r) && botPkgOk(r) && botProOk(r) && (f === "all" ? true : f === "arsip" ? !!r.arsip : !r.arsip);
     document.querySelectorAll("#botFilter button").forEach(b => { b.classList.toggle("on", b.dataset.bf === botFilter); b.querySelector("i").textContent = myBotOrders.filter(r => match(r, b.dataset.bf)).length; });
-    document.querySelectorAll("#botPkg button").forEach(b => { b.classList.toggle("on", b.dataset.bp === botPkg); b.querySelector("i").textContent = myBotOrders.filter(r => kindOk(r) && botPkgOk(r, b.dataset.bp) && !r.arsip).length; });
+    document.querySelectorAll("#botPkg button").forEach(b => { b.classList.toggle("on", b.dataset.bp === botPkg); b.querySelector("i").textContent = myBotOrders.filter(r => kindOk(r) && botProOk(r) && botPkgOk(r, b.dataset.bp) && !r.arsip).length; });
+    document.querySelectorAll("#botPro button").forEach(b => { b.classList.toggle("on", b.dataset.bpr === botPro); b.querySelector("i").textContent = myBotOrders.filter(r => kindOk(r) && botPkgOk(r) && botProOk(r, b.dataset.bpr) && !r.arsip).length; });
 
     // badge tab: pesanan yang masih berjalan (menunggu / disetujui belum dikirim)
     const open = myBotOrders.filter(r => !r.arsip && (r.status === "pending" || botState(r) === "kirim")).length, bd = $("botTabBadge");
     if (bd) { bd.textContent = open; bd.style.display = open ? "inline-block" : "none"; }
 
     // saat mencari: semua status (aktif & arsip) pada jenis yang dipilih
-    const list = botQ ? myBotOrders.filter(r => kindOk(r) && botPkgOk(r) && botHit(r)) : myBotOrders.filter(r => match(r, botFilter));
+    const list = botQ ? myBotOrders.filter(r => kindOk(r) && botPkgOk(r) && botProOk(r) && botHit(r)) : myBotOrders.filter(r => match(r, botFilter));
     botSearchInfo(list.length);
     $("botEmpty").style.display = list.length || botQ ? "none" : "block";
     const stl = { pending: "bo_st_pending", kirim: "bo_st_kirim", sent: "bo_st_sent", rejected: "bo_st_rejected", cancelled: "co_st_cancelled" };
     box.innerHTML = list.map(r => { const k = botState(r), open = botTagOpen.has(r.id), bi = botBatchInfo[r.id];
         const partial = bi && k === "kirim" && bi.sent > 0 && bi.sent < bi.total;
         const stText = partial ? t("bb_partial", { a: bi.sent, b: bi.total }) : t(stl[k] || "bo_st_pending"); return `
-        <div class="bo-item bo-s-${k}"><div><b>${r.dashboard === "BULK" ? "🧺 " + escapeHtml(t("bk_label")) : escapeHtml(r.dashboard) + " Bot"}</b>${r.dashboard === "BULK" && botPkg !== "all" ? ` <span class="bo-pkgchip">${escapeHtml(t("bo_pkg_tags", { pkg: botPkg, n: r["n_" + botPkgKey(botPkg)] }))}</span>` : ""} · <button type="button" class="bo-count" data-botags="${r.id}" aria-expanded="${open}" title="${escapeHtml(t("bo_tags_view"))}">${open ? "▾" : "▸"} ${escapeHtml(t("bo_tags_n", { n: r.jumlah }))}</button>${r.arsip ? ` <span class="bo-arch">🗂️ ${escapeHtml(t("bo_arch_tag"))}</span>` : ""}
+        <div class="bo-item bo-s-${k}"><div><b>${r.dashboard === "BULK" ? "🧺 " + escapeHtml(t("bk_label")) : escapeHtml(r.dashboard) + " Bot"}</b>${r.proses ? ` <span class="bo-pkgchip bo-prochip">📨 ${escapeHtml(botProName(r.proses))}</span>` : ""}${r.dashboard === "BULK" && botPkg !== "all" ? ` <span class="bo-pkgchip">${escapeHtml(t("bo_pkg_tags", { pkg: botPkg, n: r["n_" + botPkgKey(botPkg)] }))}</span>` : ""} · <button type="button" class="bo-count" data-botags="${r.id}" aria-expanded="${open}" title="${escapeHtml(t("bo_tags_view"))}">${open ? "▾" : "▸"} ${escapeHtml(t("bo_tags_n", { n: r.jumlah }))}</button>${r.arsip ? ` <span class="bo-arch">🗂️ ${escapeHtml(t("bo_arch_tag"))}</span>` : ""}
             <div class="bo-item-sub">${r.dashboard === "BULK" ? `BEM ${r.n_bem} · SEM ${r.n_sem} · LEM ${r.n_lem}` : escapeHtml(r.tagar_pertama || "") + (r.jumlah > 1 ? " …" : "")} · ${fmt(r.created_at, false)}</div>
             ${r.dikirim_at ? `<div class="bo-item-sub">${escapeHtml(t("bo_sent_on", { d: fmt(r.dikirim_at, true) }))}</div>` : ""}
             ${r.catatan_admin ? `<div class="bo-item-sub">💬 ${escapeHtml(r.catatan_admin)}</div>` : ""}${botBatchHtml(r)}${(() => { const h = botQ && botHit(r); return typeof h === "string" ? `<div class="bo-hit">🔎 ${escapeHtml(h)}</div>` : ""; })()}</div>
@@ -203,6 +252,9 @@ document.addEventListener("click", async (e) => {
 document.addEventListener("click", (e) => { const k = e.target.closest("#botKind button[data-bk]"); if (k) { botKind = k.dataset.bk; renderBotOrders(); } });
 document.addEventListener("click", (e) => { const f = e.target.closest("#botFilter button[data-bf]"); if (f) { botFilter = f.dataset.bf; renderBotOrders(); } });
 document.addEventListener("click", (e) => { const p = e.target.closest("#botPkg button[data-bp]"); if (p) { botPkg = p.dataset.bp; renderBotOrders(); } });
+document.addEventListener("click", (e) => { const p = e.target.closest("#botPro button[data-bpr]"); if (p) { botPro = p.dataset.bpr; renderBotOrders(); } });
+// nama proses untuk label daftar & Daftar Harga (1 request kecil, di-cache 10 menit)
+document.addEventListener("DOMContentLoaded", () => { ensureBotPkgs().then(() => { renderBotOrders(); if (typeof renderPriceList === "function") renderPriceList(); }); });
 document.addEventListener("input", (e) => {
     if (e.target.id !== "botSearch") return;
     clearTimeout(botSearchTimer);

@@ -30,10 +30,13 @@ function boSetKind(k) {
     boEl("boThHarga").textContent = bulk ? "Tier" : "Harga/tagar";
     boEl("boEmpty").textContent = bulk ? "Belum ada bulk order." : "Belum ada bot order.";
     boEl("boPinSubmit").textContent = bulk ? "Buka Bulk Order" : "Buka Bot Order";
-    boEl("boPkg").style.display = "flex";     // Bulk juga dipisah per jenis: pesanan bulk tampil di setiap jenis yang ada tagarnya
+    boEl("boPkg").style.display = "flex";
+    boEl("boProses").style.display = bulk ? "none" : "flex";     // proses 1F / 2F hanya untuk Bot Order (Bulk tidak punya proses)     // Bulk juga dipisah per jenis: pesanan bulk tampil di setiap jenis yang ada tagarnya
     if (boEl("boSearch").value) boRunSearch(); else if (boAll.length) boRender();
 }
 let boPkg = "BEM";
+let boProses = "all";     // proses pengiriman: all | 1F | 2F (hanya tab Bot Order)
+const boProLabel = p => p ? p + " Request" : "tanpa proses";
 /* pencarian: boQ = kata kunci (huruf kecil, tanpa "#"); boHits = hasil server {id -> tagar} untuk boQ (null = tidak dipakai) */
 let boQ = "", boHits = null, boSearchTimer = null, boSearchSeq = 0;
 const boHitCache = new Map();     // kata kunci -> Map(id -> tagar), dikosongkan saat data dimuat ulang
@@ -72,6 +75,7 @@ function initBotOrderPage() {
         boEl("boArchiveSent").addEventListener("click", boArchiveSent);
         boEl("boPkg").addEventListener("click", e => { const b = e.target.closest("button[data-pkg]"); if (b) { boPkg = b.dataset.pkg; if (boQ) boRunSearch(); else boRender(); } });     // pencarian tetap, dibatasi jenis baru
         boEl("boApproveAll").addEventListener("click", boApproveAll);
+        boEl("boProses").addEventListener("click", e => { const b = e.target.closest("button[data-pro]"); if (b) { boProses = b.dataset.pro; if (boQ) boRunSearch(); else boRender(); } });
         boEl("boSearch").addEventListener("input", () => { clearTimeout(boSearchTimer); boSearchTimer = setTimeout(boRunSearch, 400); });
         boEl("boSentAll").addEventListener("click", boSentAll);
         const goBot = boEl("dashBotTab"); if (goBot) goBot.addEventListener("click", () => { document.querySelector('#pageNav button[data-page="order"]').click(); if (typeof ordShow === "function") ordShow("bot"); });
@@ -108,10 +112,10 @@ async function boRunSearch() {
     boQ = boNorm(boEl("boSearch").value); boHits = null;
     const seq = ++boSearchSeq;
     if (!boQ || boQ.length < 2 || boAllTagsLoaded()) { boRender(); return; }
-    const key = boKind + ":" + boPkg + ":" + boQ;
+    const key = boKind + ":" + boPkg + ":" + boProsesV() + ":" + boQ;
     if (boHitCache.has(key)) { boHits = boHitCache.get(key); boRender(); return; }
     boRender();                                    // tampilkan dulu hasil lokal
-    const { data, error } = await boRpc("bot_search_tags", { p_q: boQ, p_bulk: boKind === "bulk", p_dashboard: boPkg === "all" ? null : boPkg });
+    const { data, error } = await boRpc("bot_search_tags", { p_q: boQ, p_bulk: boKind === "bulk", p_dashboard: boPkg === "all" ? null : boPkg, p_proses: boProsesV() === "all" ? null : boProsesV() });
     if (seq !== boSearchSeq || error) return;      // ada ketikan baru / gagal (pesan sudah ditampilkan)
     boHits = new Map((data || []).map(x => [x.id, x.tagar])); boHitCache.set(key, boHits); boRender();
 }
@@ -122,7 +126,7 @@ function boSearchInfo(rows) {
     if (!boQ) { el.style.display = "none"; return; }
     const more = boHits && boHits.size >= 50 ? " — menampilkan 50 hasil teratas, perjelas kata kunci" : "";
     const notListed = boHits ? [...boHits.keys()].filter(id => !boAll.some(r => r.id === id)).length : 0;
-    el.innerHTML = `🔍 <b>${rows.length}</b> pesanan cocok dengan “${escapeHtml(boQ)}” (semua status · ${boPkg === "all" ? "semua jenis" : "jenis " + boPkg})${more}${notListed ? ` · ${notListed} pesanan lama di luar 500 terbaru tidak ditampilkan` : ""}`
+    el.innerHTML = `🔍 <b>${rows.length}</b> pesanan cocok dengan “${escapeHtml(boQ)}” (semua status · ${boPkg === "all" ? "semua jenis" : "jenis " + boPkg}${boProsesV() === "all" ? "" : " · " + boProLabel(boProsesV())})${more}${notListed ? ` · ${notListed} pesanan lama di luar 500 terbaru tidak ditampilkan` : ""}`
         + (boQ.length < 2 && !boAllTagsLoaded() ? " · ketik minimal 2 huruf untuk mencari di semua tagar" : "");
     el.style.display = "block";
 }
@@ -145,8 +149,10 @@ function boStateFor(r, pkg = boPkg) {
 }
 const boPkgView = () => boKind === "bulk" && boPkg !== "all";   // Bulk dilihat per jenis
 const boOpenRow = (r, pkg = boPkg) => !r.arsip && (r.status === "pending" || boStateFor(r, pkg) === "kirim");
-function boMatch(r, f, pkg = boPkg) {
+const boProsesV = () => boKind === "bulk" ? "all" : boProses;
+function boMatch(r, f, pkg = boPkg, pro = boProsesV()) {
     if (boIsBulk(r) !== (boKind === "bulk")) return false;      // tab Bot hanya Bot Order, tab Bulk hanya Bulk Order
+    if (pro !== "all" && r.proses !== pro) return false;        // tab proses 1F / 2F
     if (pkg !== "all") {                                           // sub-tab BEM / SEM / LEM
         if (boIsBulk(r) ? !(Number(r["n_" + pkg.toLowerCase()]) > 0) : r.dashboard !== pkg) return false;
     }
@@ -157,6 +163,11 @@ function boMatch(r, f, pkg = boPkg) {
 function boRender() {
     boBadge();
     boEl("boFilter").querySelectorAll("button").forEach(b => { b.classList.toggle("on", b.dataset.f === boFilter); b.querySelector("i").textContent = boAll.filter(r => boMatch(r, b.dataset.f)).length; });
+    boEl("boProses").querySelectorAll("button").forEach(b => {
+        b.classList.toggle("on", b.dataset.pro === boProses);
+        const n = boAll.filter(r => boMatch(r, "all", boPkg, b.dataset.pro) && boOpenRow(r)).length;
+        b.querySelector("i").textContent = n; b.classList.toggle("has-pending", n > 0);
+    });
     boEl("boPkg").querySelectorAll("button").forEach(b => {
         b.classList.toggle("on", b.dataset.pkg === boPkg);
         const n = boAll.filter(r => boMatch(r, "all", b.dataset.pkg) && boOpenRow(r, b.dataset.pkg)).length;
@@ -192,7 +203,7 @@ function boRender() {
         return `<tr class="${r.arsip ? "bo-archived" : ""}">
             <td>${boWaktu(r.created_at)}<br><small>#${r.id}</small></td>
             <td><b>${escapeHtml(r.username)}</b>${wa ? `<br><a href="https://wa.me/${wa}?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener"><small>💬 WhatsApp</small></a>` : ""}</td>
-            <td>${boIsBulk(r) ? `<span class="chip">🧺 BULK</span>${pkgN ? ` <span class="chip">${boPkg} ${pkgN} tagar</span>` : ""}<br><small>${boBulkLabel(r)}</small>` : `<span class="chip">${escapeHtml(r.dashboard)} Bot</span>`}</td>
+            <td>${boIsBulk(r) ? `<span class="chip">🧺 BULK</span>${pkgN ? ` <span class="chip">${boPkg} ${pkgN} tagar</span>` : ""}<br><small>${boBulkLabel(r)}</small>` : `<span class="chip">${escapeHtml(r.dashboard)} Bot</span>${r.proses ? ` <span class="chip bo-pro">📨 ${escapeHtml(boProLabel(r.proses))}</span>` : `<br><small class="muted-note">tanpa proses (lama)</small>`}`}</td>
             <td><button type="button" class="bo-count" data-act="tags" data-id="${r.id}">${open ? "▾" : "▸"} ${r.jumlah} tagar</button><br><small class="bo-first">${escapeHtml(r.tagar_pertama || "")}${r.jumlah > 1 ? " …" : ""}</small>${(() => { const h = boQ && boHitOf(r); return typeof h === "string" && h !== r.tagar_pertama ? `<br><span class="bo-hit">🔎 ${escapeHtml(h)}</span>` : ""; })()}${r.catatan_pelanggan ? `<div class="bo-note-inline">📝 ${escapeHtml(r.catatan_pelanggan)}</div>` : ""}</td>
             <td>${boIsBulk(r) ? `<small>tier ${boTierLabel(r)}</small>` : boRp(r.harga_tagar)}</td><td><b>${boRp(r.total_harga)}</b></td>
             <td><span class="${st[1]}">${st[0]}</span>${r.arsip ? `<br><small>🗂️ arsip</small>` : ""}${r.catatan_admin ? `<br><small>${escapeHtml(r.catatan_admin)}</small>` : ""}</td>
@@ -217,7 +228,7 @@ async function boOnChange(e) {
     showToast(want ? "Ditandai sudah dikirim" : "Tanda dikirim dilepas", want ? "success" : "info");
     boLoad();
 }
-const boViewLabel = () => boKind === "bulk" ? (boPkg === "all" ? "bulk order" : `bulk order berisi ${boPkg}`) : boPkg === "all" ? "bot order (semua paket)" : `${boPkg} order`;
+const boViewLabel = () => (boKind === "bot" && boProses !== "all" ? boProLabel(boProses) + " · " : "") + (boKind === "bulk" ? (boPkg === "all" ? "bulk order" : `bulk order berisi ${boPkg}`) : boPkg === "all" ? "bot order (semua paket)" : `${boPkg} order`);
 /* hasil aksi massal: {ok: [id], fail: [{id, error}]} */
 function boMassToast(data, verb) {
     const ok = (data && data.ok || []).length, fail = (data && data.fail) || [];

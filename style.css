@@ -1480,4 +1480,11 @@ tr.pe-bulk .ie-input{ width:100%; }
 .bb-cur{ background:rgba(37,99,235,.08); font-weight:700; }
 tr.bb-zero td{ opacity:.55; }
 tr.bb-total td{ border-top:2px solid var(--border); }
+/* Price: Proses Pengiriman Bot (1F / 2F) */
+.bpk-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:14px; }
+.bpk-card{ border:1px solid var(--border); border-radius:14px; padding:12px; display:flex; flex-direction:column; gap:10px; background:var(--surface); }
+.bpk-card.on{ border-color:rgba(22,163,74,.55); }
+.bpk-head{ display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; } .bpk-head b{ font-size:18px; }
+.bpk-card .btn{ width:auto; align-self:flex-start; }
+.chip.bo-pro{ background:rgba(37,99,235,.12); }
 

@@ -55,6 +55,7 @@ async function prShow() {
 async function prLoad() {
     const { data, error } = await prRpc("pr_get", {});
     if (error) return;
+    if (typeof bpkLoad === "function") bpkLoad();        // panel Proses Pengiriman Bot (1F / 2F) — dimuat terpisah, tidak ikut gagal bila panel lain error
     prData = data; prRender();
     prPayLoad();
 }

@@ -75,6 +75,20 @@ Detail teknis per fitur juga ada di `UPDATE-13.md` bagian 19–23.
   - Panel Total Tagar per Hari punya pilihan jenis yang hanya mengganti tampilan, tanpa request.
   - Teks baru ada di `i18n.js` (id, en, vi, ar) dan `lang-tr.js`.
 
+### 8. Proses pengiriman Bot Order: 1F Request / 2F Request
+- **1 pesanan = 1 proses + 1 jenis.** Pelanggan memilih proses lewat dropdown **"Pilih proses pengiriman"** (1F / 2F), lalu memilih **BEM / SEM / LEM**, mengisi tagar, dan membaca **notes/rules** proses itu yang diatur admin. Campuran proses atau jenis dalam satu pesanan dikunci di database (`cu_request_bot_order`).
+- **Harga per kombinasi** (BEM-1F, SEM-1F, … LEM-2F) diatur di **Price → Proses Pengiriman Bot (1F / 2F)**, bersama nama, notes/rules, dan aktif/nonaktif.
+  - **Harga custom per pelanggan** memakai `price_item` (kunci `bot:1F:BEM` …), muncul di menu Custom Price / Harga Pelanggan.
+  - Harga **dihitung ulang di server**; harga dari browser tidak dipakai.
+- Kolom baru `bot_orders.proses` / `bot_queue.proses`. **Order lama tetap aman** (proses kosong, tampil "tanpa proses"). **Bulk Order tidak berubah.**
+- **Pemisahan:**
+  - Admin Bot Order: tab **Semua proses / 1F / 2F** di atas tab BEM / SEM / LEM.
+  - Batch Tagar dihitung **per kombinasi proses + jenis**, ditambah antrian "Tanpa proses" untuk order lama dan Bulk. File ZIP juga dipisah per proses dan jenis.
+  - Search tagar per proses, dan kolom 1F / 2F di Total Tagar per Hari.
+  - Portal pelanggan: filter proses, label proses di setiap pesanan, chip batch "BEM · 1F", Daftar Harga per proses, total per hari 1F / 2F.
+- Pengaturan proses di browser pelanggan **di-cache 10 menit** dan dihapus otomatis saat admin mengubahnya. Tidak ada polling baru, dan tidak ada `select *`.
+- Panel lama "Harga Bot Order" (per jenis) tidak lagi dipakai untuk pesanan baru.
+
 ---
 
 ## Urutan menjalankan migrasi (`/migrations`)
@@ -90,6 +104,9 @@ Syaratnya, semua SQL lama di `UPDATE-13.md` (sampai `koin-usdt-24b`) sudah perna
 | 4 | `migrations/004_cu_cancel_order.sql` | Batal order pelanggan (status `cancelled`, `cu_cancel_order`) | 001 |
 | 5 | `migrations/005_hemat_egress.sql` | Auto-refresh per tabel & per pelanggan, `admin_badges`, index | `koin-usdt-21` + 001–004 |
 | 6 | `migrations/006_bot_per_jenis.sql` | Bot Order per jenis: `bot_list` (+ sisa tagar per jenis), `bot_set_dikirim_pkg`, `bot_search_tags` per jenis, `bot_daily_admin`, `cu_bot_daily` per jenis, `cu_my_bot_tags_all`. Tanpa kolom baru | 001–005 |
+| 7 | `migrations/007_bot_proses_1f_2f.sql` | Proses 1F/2F (bagian 1): kolom `proses`, tabel `bot_packages`, harga custom (`price_item` + `pi_catalog`), `bot_pkg_list/save`, `cu_bot_packages`, `cu_request_bot_order` wajib proses | 001–006 |
+| 8 | `migrations/008_bot_proses_batch.sql` | Proses 1F/2F (bagian 2): antrian & batch per proses + jenis, `bot_list` / `cu_my_bot_orders` membawa proses, `bot_search_tags` filter proses | 007 |
+| 9 | `migrations/009_bot_proses_total_bsl.sql` | Proses 1F/2F (bagian 3): total per hari 1F/2F, keterangan BSL Profit, judul notifikasi Telegram | 008 |
 
 ⚠️ **Jangan** menjalankan ulang `sql/koin-usdt-23-bot-batch.sql` / `23b` setelah migrasi 001 dan 004. Kalau dijalankan ulang, fungsi batch kembali ke versi lama dan bug Batch 1 muncul lagi.
 Kalau tidak sengaja terjalankan, jalankan ulang 001, lalu 004.
@@ -193,6 +210,22 @@ Lakukan untuk setiap jenis: **Bot Order, Bulk Order, Pesanan Baru, Perpanjang, K
 5. Buat pesanan baru, lalu cari lagi → daftar tagar diambil ulang 1 kali.
 6. Login sebagai pelanggan lain → tagar pelanggan pertama tidak pernah muncul.
 7. Ganti bahasa ID / EN / VI / AR / TR → placeholder dan teks hasil ikut berganti.
+
+### I. Proses pengiriman 1F / 2F Request
+1. Jalankan migrasi **007 → 008 → 009**. Admin → **Price** → panel **Proses Pengiriman Bot (1F / 2F)**:
+   - 1F: harga BEM 1000, SEM 2000, LEM 0, notes "Rule A", centang Aktif → Simpan.
+   - 2F: biarkan nonaktif.
+   - Mencentang Aktif tanpa harga apa pun → muncul pesan "Isi minimal satu harga".
+2. Pelanggan → Bot Order → **Pesan Bot Order**:
+   - Dropdown "Pilih proses pengiriman" hanya berisi **1F Request**. Tombol Pesan dan tombol jenis nonaktif sebelum proses dipilih.
+   - Pilih 1F → "Rule A" tampil; BEM Rp 1.000, SEM Rp 2.000, **LEM nonaktif**.
+   - Pilih BEM, isi 2 tagar → total Rp 2.000 → **Pesan** → dialog Ya / Tidak → **Ya** → saldo berkurang 2.000 dan pesanan tampil dengan label "📨 1F Request".
+   - Cek: `select id, dashboard, proses, harga_tagar, total_harga from bot_orders order by id desc limit 1;` → `BEM | 1F | 1000 | 2000`.
+3. **Harga dikunci di server:** di console browser jalankan `cuRpc("cu_request_bot_order", { p_dashboard: "LEM", p_proses: "1F", p_tagar_list: ["#x"] })` → ditolak "Harga Bot Order belum diatur admin". Tanpa `p_proses` → ditolak "Pilih proses pengiriman".
+4. **Harga custom:** Admin → Custom Price → pilih pelanggan → grup "Bot Order · Proses" → isi "1F Request · BEM" = 700 → Simpan. Dalam ±10 menit (atau setelah muat ulang), harga BEM di form pelanggan itu menjadi Rp 700, tanpa coretan. Harga Pelanggan tampil dengan coretan.
+5. **Admin Bot Order:** tab **1F** hanya menampilkan pesanan 1F. Setujui → Batch Tagar → **1F Request → BEM** → tagar tampil di "1F · BEM · Batch 1". Order lama tetap ada di "Tanpa proses".
+6. Total per hari: kolom 1F / 2F di admin, dan pilihan 1F / 2F di panel pelanggan.
+7. **Bulk Order dan langganan harian** tetap seperti sebelumnya. Login pelanggan dan cancel order tetap berfungsi.
 
 ---
 

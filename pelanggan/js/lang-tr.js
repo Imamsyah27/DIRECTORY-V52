@@ -480,3 +480,16 @@ Object.assign(TRANSLATIONS.tr, {
     bk_send: "Sipariş ver",
     bo_pkg_tags: "{pkg}: {n} etiket"
 });
+
+/* Bot Order: proses pengiriman 1F / 2F Request */
+Object.assign(TRANSLATIONS.tr, {
+    bo_sub_proses: "Teslimat sürecini ve bot türünü seçin, ardından etiketleri girin. 1 sipariş = 1 süreç + 1 tür.",
+    bo_proses_label: "Teslimat süreci",
+    bo_proses_ph: "Teslimat sürecini seçin",
+    bo_proses_rules: "Notlar / kurallar",
+    bo_proses_none: "Henüz kullanılabilir teslimat süreci yok. Lütfen yöneticiyle iletişime geçin.",
+    bo_err_proses: "Önce teslimat sürecini seçin",
+    bo_err_pkg: "Bot türünü seçin (BEM / SEM / LEM)",
+    bo_proses_off: "Bu teslimat süreci şu anda kullanılamıyor",
+    bo_proses_all: "Tüm süreçler"
+});
