@@ -122,8 +122,10 @@ function dedupeAsync(fn) {
             if (Date.now() - startedAt > 500) again = true;
             return running;
         }
+        // nilai kembalian fn DITERUSKAN ke pemanggil (mis. loadCoin() -> saldo koin dipakai saat membayar)
         running = (async () => {
-            try { do { again = false; startedAt = Date.now(); await fn.apply(this, lastArgs); } while (again); }
+            let result;
+            try { do { again = false; startedAt = Date.now(); result = await fn.apply(this, lastArgs); } while (again); return result; }
             finally { running = null; }
         })();
         return running;
